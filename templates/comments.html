@@ -48,10 +48,10 @@
 </table>
 
 {% if comments.has_prev %}
-    <a href="{{ url_for('comments', page=comments.prev_num) }}">&lt;&lt; Newer comments</a>{% else %}
+    <a href="{{ url_for('comments', page=comments.prev_num) }}">&lt;&lt; 更新评论</a>{% else %}
     &lt;&lt; 更新评论{% endif %} |
 {% if comments.has_next %}
-    <a href="{{ url_for('comments', page=comments.next_num) }}">Older comments &gt;&gt;</a>{% else %}
+    <a href="{{ url_for('comments', page=comments.next_num) }}">更旧评论 &gt;&gt;</a>{% else %}
     更旧评论 &gt;&gt;{% endif %}
 
 </body>
