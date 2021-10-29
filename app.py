@@ -56,4 +56,4 @@ if __name__ == '__main__':
     scraper = Scraper(config, db, app)
     scraper.run_scraper()
 
-    app.run()
+    app.run(host='0.0.0.0')
