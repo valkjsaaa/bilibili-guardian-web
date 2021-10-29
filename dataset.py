@@ -45,6 +45,13 @@ class Comment(db.Model):
             return f"https://t.bilibili.com/{oid}#reply{rpid}"
 
     @staticmethod
+    def get_object_link(type_: int, oid: int, rpid: int) -> str:
+        if type_ == 1:
+            return f"https://www.bilibili.com/video/av{oid}"
+        else:
+            return f"https://t.bilibili.com/{oid}"
+
+    @staticmethod
     def abstract_text(text: str, length: int) -> str:
         if len(text) < length:
             return text

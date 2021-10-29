@@ -31,7 +31,8 @@
         <tr>
 
             <th scope="row">{{ comment.oid }}</th>
-            <th>{{ comment.oname }}</th>
+            <th><a href="{{ comment.get_object_link(comment.type_, comment.oid, comment.rpid) }}"
+                   target="_blank">{{ comment.oname }}</a></th>
             <th>{{ comment.mid }}</th>
             <th>{{ comment.mname }}</th>
             <th>{{ comment.ctime }}</th>
