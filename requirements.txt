@@ -1,0 +1,6 @@
+git+https://github.com/valkjsaaa/bilibili_api.git@f448f0c7b4c4691932e2c61b1493b5a145c9bdf1
+Flask~=1.1.2
+Flask-Script~=2.0.6
+Flask-SQLAlchemy~=2.5.1
+SQLAlchemy~=1.4.26
+aiohttp~=3.7.4.post0
