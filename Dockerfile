@@ -14,4 +14,4 @@ COPY . /app
 
 ENTRYPOINT [ "python3" ]
 
-CMD [ "app.py", "--db", "sqlite:///db.sqlite?check_same_thread=False" ]
+CMD [ "-u", "app.py", "--db", "sqlite:///db.sqlite?check_same_thread=False" ]

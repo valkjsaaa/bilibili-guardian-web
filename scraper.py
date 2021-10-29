@@ -1,4 +1,5 @@
 import asyncio
+import sys
 import threading
 import traceback
 
@@ -75,6 +76,8 @@ class Scraper:
             except Exception as err:
                 print(f"Unknown posting exception: {err}")
                 print(traceback.format_exc())
+            finally:
+                sys.stdout.flush()
 
     def scraper_thread(self, loop):
         asyncio.set_event_loop(loop)
