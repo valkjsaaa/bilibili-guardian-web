@@ -7,13 +7,12 @@
     <!-- Bootstrap CSS -->
     <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True, _scheme='https') }}" rel="stylesheet"
           integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="{{ url_for('static', filename='bootstrap-toaster.min.css', _external=True, _scheme='https') }}"
+          rel="stylesheet">
 
     <title>最新评论</title>
 </head>
 <body>
-<script src="{{ url_for('static', filename='jquery-3.3.1.slim.min.js', _external=True, _scheme='https') }}"
-        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
-        crossorigin="anonymous" async></script>
 <script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True, _scheme='https') }}"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
         crossorigin="anonymous" async>
@@ -66,9 +65,21 @@
             return response.json();
         }).then(function (data) {
             if (data.code === 0) {
-                $.toaster("成功删除 " + message);
+                let toast = {
+                    title: "成功删除",
+                    message: message,
+                    status: TOAST_STATUS.SUCCESS,
+                    timeout: 5000
+                }
+                Toast.create(toast);
             } else {
-                $.toaster(`删除失败 ${message}\n错误代码：${data.code}\n错误信息：${data.message}`);
+                let toast = {
+                    title: "删除失败",
+                    message: `错误代码：${data.code}\n错误信息：${data.message}`,
+                    status: TOAST_STATUS.DANGER,
+                    timeout: 5000
+                }
+                Toast.create(toast);
             }
         });
     }
