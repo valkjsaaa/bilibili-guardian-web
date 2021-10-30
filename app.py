@@ -2,6 +2,7 @@ import argparse
 
 from bilibili_api.comment import ResourceType
 from flask import Flask, render_template, request
+from flask_cors import CORS, cross_origin
 from flask_script import Manager
 
 from config import Config
@@ -9,9 +10,11 @@ from dataset import db, Comment
 from scraper import Scraper
 
 app = Flask(__name__)
+cors = CORS(app)
 config: Config
 
 
+@cross_origin()
 @app.route('/comments', methods=['GET'])
 def comments():  # put application's code here
     type_ = request.args.get('type')
@@ -24,8 +27,8 @@ def comments():  # put application's code here
         page = int(page)
     per_page = 50
     if type_ == "dynamic":
-        page_comments = Comment.query.\
-            filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])).\
+        page_comments = Comment.query. \
+            filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
     else:
         page_comments = Comment.query. \
