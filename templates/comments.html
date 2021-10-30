@@ -55,6 +55,13 @@
                     </li>
                 {% endfor %}
             </ul>
+            <span class="navbar-text">
+                {% if last_refreshed != None %}
+                    上次刷新 {{ last_refreshed.total_seconds() }} 秒前
+                {% else %}
+                    等待首次刷新
+                {% endif %}
+            </span>
         </div>
     </div>
 </nav>
@@ -78,7 +85,7 @@
                    target="_blank">{{ comment.oname }}</a></th>
             <th>{{ comment.mid }}</th>
             <th>{{ comment.mname }}</th>
-            <th>{{ comment.ctime }}</th>
+            <th>{{ comment.create_time_utc8() }}</th>
             <th><a href="{{ comment.get_link(comment.type_, comment.oid, comment.rpid) }}"
                    target="_blank">{{ comment.message }}</a></th>
 
@@ -88,11 +95,13 @@
 </table>
 
 {% if comments.has_prev %}
-    <a href="#" data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.prev_num, type=type_) }}">&lt;&lt;
+    <a href="#"
+       data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.prev_num, type=type_) }}">&lt;&lt;
         更新评论</a>{% else %}
     &lt;&lt; 更新评论{% endif %} |
 {% if comments.has_next %}
-    <a href="#" data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.next_num, type=type_) }}">更旧评论
+    <a href="#"
+       data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.next_num, type=type_) }}">更旧评论
         &gt;&gt;</a>{% else %}
     更旧评论 &gt;&gt;{% endif %}
 

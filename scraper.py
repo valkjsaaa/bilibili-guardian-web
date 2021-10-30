@@ -2,6 +2,8 @@ import asyncio
 import sys
 import threading
 import traceback
+from datetime import datetime
+from queue import Queue
 
 import aiohttp.client_exceptions
 from bilibili_api import user, comment
@@ -26,6 +28,8 @@ class Scraper:
         self.config = config
         self.db = db
         self.app = app
+        self.last_refreshed = None
+        self.refresh_queue = Queue()
 
     async def scrap(self):
         user_obj = user.User(self.config.user)
@@ -56,6 +60,8 @@ class Scraper:
                                   comment.get_comments(video["aid"], type_=comment.ResourceType.VIDEO, page_index=i + 1)
                                   )
                 new_comments = new_comments_result['replies']
+                for comment_ in new_comments:
+                    video_comments[comment_['rpid']] = comment_
                 filtered_new_comments = [
                     comment_
                     for comment_ in new_comments
@@ -63,10 +69,17 @@ class Scraper:
                 ]
                 if len(filtered_new_comments) == 0:  # last page or all comments are covered in database
                     break
-                for comment_ in filtered_new_comments:
-                    video_comments[comment_['rpid']] = comment_
             db_comments = [Comment(comment_, video['title']) for comment_ in video_comments.values()]
-            self.db.session.bulk_save_objects(db_comments)
+            earliest_time = min([comment_.ctime for comment_ in db_comments])
+            later_comments = Comment.query.filter(Comment.ctime >= earliest_time, Comment.oid == video["aid"]).all()
+            later_comments_rpids = [comment_.rpid for comment_ in later_comments]
+            for later_comment in later_comments:
+                if later_comment.rpid not in video_comments.keys():
+                    later_comment.guardian_status = -1
+                else:
+                    later_comment.guardian_status = 1
+            filtered_db_comments = [comment_ for comment_ in db_comments if comment_.rpid not in later_comments_rpids]
+            self.db.session.bulk_save_objects(filtered_db_comments)
             self.db.session.commit()
 
         dynamics = []
@@ -123,6 +136,8 @@ class Scraper:
                                                        page_index=i + 1)
                                   )
                 new_comments = new_comments_result['replies']
+                for comment_ in new_comments:
+                    dynamic_comments[comment_['rpid']] = comment_
                 filtered_new_comments = [
                     comment_
                     for comment_ in new_comments
@@ -130,11 +145,20 @@ class Scraper:
                 ]
                 if len(filtered_new_comments) == 0:  # last page or all comments are covered in database
                     break
-                for comment_ in filtered_new_comments:
-                    dynamic_comments[comment_['rpid']] = comment_
             db_comments = [Comment(comment_, dynamic_desc(dynamic)) for comment_ in dynamic_comments.values()]
-            self.db.session.bulk_save_objects(db_comments)
+            earliest_time = min([comment_.ctime for comment_ in db_comments])
+            later_comments = \
+                Comment.query.filter(Comment.ctime >= earliest_time, Comment.oid == dynamic_oid(dynamic)).all()
+            later_comments_rpids = [comment_.rpid for comment_ in later_comments]
+            for later_comment in later_comments:
+                if later_comment.rpid not in dynamic_comments.keys():
+                    later_comment.guardian_status = -1
+                else:
+                    later_comment.guardian_status = 1
+            filtered_db_comments = [comment_ for comment_ in db_comments if comment_.rpid not in later_comments_rpids]
+            self.db.session.bulk_save_objects(filtered_db_comments)
             self.db.session.commit()
+        self.last_refreshed = datetime.now()
 
     async def scraper_loop(self):
         self.app.app_context().push()

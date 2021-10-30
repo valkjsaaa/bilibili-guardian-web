@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bilibili_api.comment import ResourceType
 from flask_sqlalchemy import SQLAlchemy
@@ -23,6 +23,9 @@ class Comment(db.Model):
     like = Column(Integer)  # 点赞数目
     guardian_status = Column(Integer)  # 守护状态
     raw = Column(Text)  # 原始 JSON
+
+    def create_time_utc8(self):
+        return self.ctime + timedelta(hours=8)
 
     def type_name(self):
         if self.type_ == ResourceType.VIDEO:
