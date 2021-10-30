@@ -64,6 +64,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_page', type=int, help="maximum pages to scrap")
 
     args = parser.parse_args()
+    app.jinja_env.auto_reload = True
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = args.db
 
     app.app_context().push()

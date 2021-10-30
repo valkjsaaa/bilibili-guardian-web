@@ -6,6 +6,7 @@ from datetime import datetime
 from queue import Queue
 
 import aiohttp.client_exceptions
+import tqdm as tqdm
 from bilibili_api import user, comment
 from bilibili_api.comment import ResourceType
 from flask import Flask
@@ -52,7 +53,7 @@ class Scraper:
 
         recent_videos = videos[:min(self.config.video_count, len(videos))]
 
-        for video in recent_videos:
+        for video in tqdm.tqdm(recent_videos):
             video_comments = {}
             for i in range(self.config.max_page):
                 new_comments_result = \
@@ -126,7 +127,7 @@ class Scraper:
 
         recent_dynamics = dynamics[:min(self.config.dynamic_count, len(dynamics))]
 
-        for dynamic in recent_dynamics:
+        for dynamic in tqdm.tqdm(recent_dynamics):
             dynamic_comments = {}
             for i in range(self.config.max_page):
                 new_comments_result = \

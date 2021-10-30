@@ -11,28 +11,93 @@
     <title>最新评论</title>
 </head>
 <body>
+<script src="{{ url_for('static', filename='jquery-3.3.1.slim.min.js', _external=True, _scheme='https') }}"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True, _scheme='https') }}"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
         crossorigin="anonymous">
 </script>
+<script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True, _scheme='https') }}">
+</script>
 <script>
-    document.querySelector("body").addEventListener('click', function (e) {
-        const anchor = e.target.closest('a');
-        if (anchor !== null) {
-            if (!anchor.hasAttribute("data-href")) return;
-            if (window.location.href.indexOf("bilibili.com") > -1) {
-                fetch(anchor.dataset.href)
-                    .then(resp => resp.text())
-                    .then(data => {
-                        document.open();
-                        document.write(data);
-                        document.close()
-                    });
-            } else {
-                window.location.href = anchor.dataset.href;
+    const isBilibili = window.location.href.indexOf("bilibili.com") > -1;
+
+    function getCookie(cname) {
+        let name = cname + "=";
+        let decodedCookie = decodeURIComponent(document.cookie);
+        let ca = decodedCookie.split(';');
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i];
+            while (c.charAt(0) === ' ') {
+                c = c.substring(1);
+            }
+            if (c.indexOf(name) === 0) {
+                return c.substring(name.length, c.length);
             }
         }
-    }, false);
+        return "";
+    }
+
+    function deleteComment(type, oid, rpid, message) {
+        const opts = {
+            'type': type,
+            'oid': oid,
+            'rpid': rpid,
+            'csrf': getCookie('bili_jct'),
+            'jsonp': 'jsonp'
+        };
+        console.log(opts);
+        let formBody = [];
+        for (const property in opts) {
+            const encodedKey = encodeURIComponent(property);
+            const encodedValue = encodeURIComponent(opts[property]);
+            formBody.push(encodedKey + "=" + encodedValue);
+        }
+        formBody = formBody.join("&");
+        fetch('https://api.bilibili.com/x/v2/reply/del', {
+            method: 'post',
+            body: formBody,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+              },
+              credentials: 'include'
+        }).then(function (response) {
+            return response.json();
+        }).then(function (data) {
+            if (data.code === 0) {
+                $.toaster("成功删除 " + message);
+            } else {
+                $.toaster(`删除失败 ${message}\n错误代码：${data.code}\n错误信息：${data.message}`);
+            }
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+         if (!is_bilibili) {
+            const all_bilibili_dom = document.getElementsByClassName("bilibili");
+            Array.from(all_bilibili_dom).forEach((element) => {
+                element.remove();
+            })
+        }
+        document.querySelector("body").addEventListener('click', function (e) {
+            const anchor = e.target.closest('a');
+            if (anchor !== null) {
+                if (!anchor.hasAttribute("data-href")) return;
+                if (isBilibili) {
+                    fetch(anchor.dataset.href)
+                        .then(resp => resp.text())
+                        .then(data => {
+                            document.open();
+                            document.write(data);
+                            document.close()
+                        });
+                } else {
+                    window.location.href = anchor.dataset.href;
+                }
+            }
+        }, false);
+    });
 </script>
 <nav class="navbar navbar-expand-sm navbar-light bg-light">
     <div class="container-fluid">
@@ -74,6 +139,7 @@
         <th scope="col">用户名</th>
         <th scope="col">评论时间</th>
         <th scope="col">评论内容</th>
+        <th scope="col" class="bilibili">删除</th>
     </tr>
     </thead>
     <tbody>
@@ -88,7 +154,20 @@
             <th>{{ comment.create_time_utc8() }}</th>
             <th><a href="{{ comment.get_link(comment.type_, comment.oid, comment.rpid) }}"
                    target="_blank">{{ comment.message }}</a></th>
-
+            <th scope="col" class="bilibili">
+                <button
+                        type="button"
+                        class="btn btn-warning"
+                        onclick='deleteComment(
+                                {{ comment.type_ }},
+                                {{ comment.oid }},
+                                {{ comment.rpid }},
+                                {{ comment | string | tojson }}
+                                )'
+                >
+                    删除
+                </button>
+            </th>
         </tr>
     {% endfor %}
     </tbody>
