@@ -78,4 +78,5 @@ if __name__ == '__main__':
     scraper = Scraper(config, db, app)
     scraper.run_scraper()
 
-    app.run(host='0.0.0.0')
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+    app.run(host='0.0.0.0', port=5000)
