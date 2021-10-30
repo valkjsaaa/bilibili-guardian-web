@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap CSS -->
-    <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True) }}" rel="stylesheet"
+    <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True, _scheme='https') }}" rel="stylesheet"
           integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 
     <title>最新评论</title>
 </head>
 <body>
-<script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True) }}"
+<script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True, _scheme='https') }}"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
         crossorigin="anonymous">
 </script>
@@ -44,7 +44,7 @@
             <ul class="navbar-nav">
                 {% for nav_type, nav_name in [("video", "视频评论"), ("dynamic", "动态评论")] %}
                     <li class="nav-item">
-                        {% set url = url_for('comments', _external=True, pn=1, type=nav_type) %}
+                        {% set url = url_for('comments', _external=True, _scheme='https', pn=1, type=nav_type) %}
                         {% if nav_type == type_ %}
                             <a class="nav-link active" aria-current="page" href="#" data-href="{{ url }}">
                         {% else %}
@@ -88,11 +88,11 @@
 </table>
 
 {% if comments.has_prev %}
-    <a href="#" data-href="{{ url_for('comments', _external=True, pn=comments.prev_num, type=type_) }}">&lt;&lt;
+    <a href="#" data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.prev_num, type=type_) }}">&lt;&lt;
         更新评论</a>{% else %}
     &lt;&lt; 更新评论{% endif %} |
 {% if comments.has_next %}
-    <a href="#" data-href="{{ url_for('comments', _external=True, pn=comments.next_num, type=type_) }}">更旧评论
+    <a href="#" data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.next_num, type=type_) }}">更旧评论
         &gt;&gt;</a>{% else %}
     更旧评论 &gt;&gt;{% endif %}
 
