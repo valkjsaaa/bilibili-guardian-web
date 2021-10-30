@@ -5,16 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap CSS -->
-    <link href="/static/bootstrap.min.css" rel="stylesheet"
+    <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True) }}" rel="stylesheet"
           integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
 
     <title>最新评论</title>
 </head>
 <body>
-<script src="/static/bootstrap.bundle.min.js"
+<script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True) }}"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
-        crossorigin="anonymous"></script>
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
+        crossorigin="anonymous">
+</script>
+<script>
+    document.querySelector("body").addEventListener('click', function (e) {
+        const anchor = e.target.closest('a');
+        if (anchor !== null) {
+            if (!anchor.hasAttribute("data-href")) return;
+            if (window.location.href.indexOf("bilibili.com") > -1) {
+                fetch(anchor.dataset.href)
+                    .then(resp => resp.text())
+                    .then(data => {
+                        document.open();
+                        document.write(data);
+                        document.close()
+                    });
+            } else {
+                window.location.href = anchor.dataset.href;
+            }
+        }
+    }, false);
+</script>
+<nav class="navbar navbar-expand-sm navbar-light bg-light">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -24,11 +44,11 @@
             <ul class="navbar-nav">
                 {% for nav_type, nav_name in [("video", "视频评论"), ("dynamic", "动态评论")] %}
                     <li class="nav-item">
-                        {% set url = url_for('comments', pn=1, type=nav_type) %}
+                        {% set url = url_for('comments', _external=True, pn=1, type=nav_type) %}
                         {% if nav_type == type_ %}
-                            <a class="nav-link active" aria-current="page" href="{{ url }}">
+                            <a class="nav-link active" aria-current="page" href="#" data-href="{{ url }}">
                         {% else %}
-                            <a class=" nav-link" href="{{ url }}">
+                            <a class=" nav-link" href="#" data-href="{{ url }}">
                         {% endif %}
                         {{ nav_name }}
                         </a>
@@ -68,10 +88,12 @@
 </table>
 
 {% if comments.has_prev %}
-    <a href="{{ url_for('comments', pn=comments.prev_num, type=type_) }}">&lt;&lt; 更新评论</a>{% else %}
+    <a href="#" data-href="{{ url_for('comments', _external=True, pn=comments.prev_num, type=type_) }}">&lt;&lt;
+        更新评论</a>{% else %}
     &lt;&lt; 更新评论{% endif %} |
 {% if comments.has_next %}
-    <a href="{{ url_for('comments', pn=comments.next_num, type=type_) }}">更旧评论 &gt;&gt;</a>{% else %}
+    <a href="#" data-href="{{ url_for('comments', _external=True, pn=comments.next_num, type=type_) }}">更旧评论
+        &gt;&gt;</a>{% else %}
     更旧评论 &gt;&gt;{% endif %}
 
 </body>

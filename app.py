@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from bilibili_api.comment import ResourceType
 from flask import Flask, render_template, request
@@ -70,6 +71,8 @@ if __name__ == '__main__':
         config_dict['dynamic_count'] = args.dynamic_count
     if args.max_page is not None:
         config_dict['max_page'] = args.max_page
+    if 'URL' in os.environ:
+        app.config['SERVER_NAME'] = os.environ['URL']
 
     config = Config(**config_dict)
     scraper = Scraper(config, db, app)
