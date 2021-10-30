@@ -139,13 +139,13 @@ class Scraper:
     async def scraper_loop(self):
         self.app.app_context().push()
         while True:
-            # try:
-            await self.scrap()
-            # except Exception as err:
-            #     print(f"Unknown posting exception: {err}")
-            #     print(traceback.format_exc())
-            # finally:
-            #     sys.stdout.flush()
+            try:
+                await self.scrap()
+            except Exception as err:
+                print(f"Unknown posting exception: {err}")
+                print(traceback.format_exc())
+            finally:
+                sys.stdout.flush()
 
     def scraper_thread(self, loop):
         asyncio.set_event_loop(loop)
