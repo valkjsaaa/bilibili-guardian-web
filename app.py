@@ -1,6 +1,7 @@
 import argparse
 
-from flask import Flask, render_template
+from bilibili_api.comment import ResourceType
+from flask import Flask, render_template, request
 from flask_script import Manager
 
 from config import Config
@@ -11,11 +12,26 @@ app = Flask(__name__)
 config: Config
 
 
-@app.route('/comments/<int:page>', methods=['GET'])
-def comments(page=1):  # put application's code here
+@app.route('/comments', methods=['GET'])
+def comments():  # put application's code here
+    type_ = request.args.get('type')
+    page = request.args.get('pn')
+    if type_ != "dynamic":
+        type_ = "video"
+    if page is None:
+        page = 1
+    else:
+        page = int(page)
     per_page = 50
-    page_comments = Comment.query.order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
-    return render_template('comments.html', comments=page_comments)
+    if type_ == "dynamic":
+        page_comments = Comment.query.\
+            filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])).\
+            order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
+    else:
+        page_comments = Comment.query. \
+            filter_by(type_=ResourceType.VIDEO.value). \
+            order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
+    return render_template('comments.html', comments=page_comments, type_=type_)
 
 
 manager = Manager(app)

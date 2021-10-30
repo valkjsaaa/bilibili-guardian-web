@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 
+from bilibili_api.comment import ResourceType
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, DateTime, Text
 
@@ -24,17 +25,23 @@ class Comment(db.Model):
     raw = Column(Text)  # 原始 JSON
 
     def type_name(self):
-        if self.type_ == 1:
+        if self.type_ == ResourceType.VIDEO:
             return "视频"
-        elif self.type_ == 12:
+        elif self.type_ == ResourceType.ARTICLE:
+            return "文章"
+        elif self.type_ == ResourceType.DYNAMIC:
             return "动态"
+        elif self.type_ == ResourceType.DYNAMIC_DRAW:
+            return "图片动态"
         else:
             return "未知"
 
     def object_desc(self):
-        if self.type_ == 1:
+        if self.type_ == ResourceType.VIDEO:
             return f"{self.type_name()} av{self.oid}"
-        elif self.type == 12:
+        elif self.type_ == ResourceType.ARTICLE:
+            return f"{self.type_name()} {self.oid}"
+        elif self.type_ in [ResourceType.DYNAMIC, ResourceType.DYNAMIC_DRAW]:
             return f"{self.type_name()} {self.oid}"
 
     @staticmethod

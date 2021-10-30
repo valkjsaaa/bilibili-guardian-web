@@ -14,7 +14,30 @@
 <script src="/static/bootstrap.bundle.min.js"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
         crossorigin="anonymous"></script>
-
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                {% for nav_type, nav_name in [("video", "视频评论"), ("dynamic", "动态评论")] %}
+                    <li class="nav-item">
+                        {% set url = url_for('comments', pn=1, type=nav_type) %}
+                        {% if nav_type == type_ %}
+                            <a class="nav-link active" aria-current="page" href="{{ url }}">
+                        {% else %}
+                            <a class=" nav-link" href="{{ url }}">
+                        {% endif %}
+                        {{ nav_name }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</nav>
 <table class="table table-hover">
     <thead>
     <tr>
@@ -45,10 +68,10 @@
 </table>
 
 {% if comments.has_prev %}
-    <a href="{{ url_for('comments', page=comments.prev_num) }}">&lt;&lt; 更新评论</a>{% else %}
+    <a href="{{ url_for('comments', pn=comments.prev_num, type=type_) }}">&lt;&lt; 更新评论</a>{% else %}
     &lt;&lt; 更新评论{% endif %} |
 {% if comments.has_next %}
-    <a href="{{ url_for('comments', page=comments.next_num) }}">更旧评论 &gt;&gt;</a>{% else %}
+    <a href="{{ url_for('comments', pn=comments.next_num, type=type_) }}">更旧评论 &gt;&gt;</a>{% else %}
     更旧评论 &gt;&gt;{% endif %}
 
 </body>
