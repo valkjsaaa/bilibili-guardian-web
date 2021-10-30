@@ -20,7 +20,7 @@
 <script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True, _scheme='https') }}" async>
 </script>
 <script>
-    const isBilibili = window.location.href.indexOf("bilibili.com") > -1;
+    isBilibili = window.location.href.indexOf("bilibili.com") > -1;
 
     function getCookie(cname) {
         let name = cname + "=";
