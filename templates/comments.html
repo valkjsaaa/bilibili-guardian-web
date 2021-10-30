@@ -60,8 +60,8 @@
             body: formBody,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
-              },
-              credentials: 'include'
+            },
+            credentials: 'include'
         }).then(function (response) {
             return response.json();
         }).then(function (data) {
@@ -74,7 +74,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
-         if (!is_bilibili) {
+        if (!isBilibili) {
             const all_bilibili_dom = document.getElementsByClassName("bilibili");
             Array.from(all_bilibili_dom).forEach((element) => {
                 element.remove();
@@ -119,6 +119,15 @@
                         </a>
                     </li>
                 {% endfor %}
+                <li>
+                    <a class="nav-link" href="javascript:(function(){ if(window.location.href.indexOf('bilibili.com') > -1) {
+fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video") }}')
+  .then(resp => resp.text())
+  .then(data => {document.open();document.write(data);document.close()});
+  } else {
+  alert('请在B站点击此书签');
+  }})()">一键删除书签</a>
+                </li>
             </ul>
             <span class="navbar-text">
                 {% if last_refreshed != None %}
