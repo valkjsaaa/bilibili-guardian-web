@@ -180,8 +180,8 @@ fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video
                         class="btn btn-warning"
                         onclick='deleteComment(
                                 {{ comment.type_ }},
-                                {{ comment.oid | string }},
-                                {{ comment.rpid | string }},
+                                "{{ comment.oid | string }}",
+                                "{{ comment.rpid | string }}",
                                 {{ comment | string | tojson }}
                                 )'
                 >
