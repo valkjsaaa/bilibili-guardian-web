@@ -49,17 +49,18 @@ class Comment(db.Model):
 
     @staticmethod
     def get_link(type_: int, oid: int, rpid: int) -> str:
-        if type_ == 1:
-            return f"https://www.bilibili.com/video/av{oid}#reply{rpid}"
-        else:
-            return f"https://t.bilibili.com/{oid}#reply{rpid}"
+        return Comment.get_object_link(type_, oid, rpid) + "#reply{rpid}"
 
     @staticmethod
     def get_object_link(type_: int, oid: int, rpid: int) -> str:
-        if type_ == 1:
+        if type_ == ResourceType.VIDEO.value:
             return f"https://www.bilibili.com/video/av{oid}"
-        else:
+        elif type_ == ResourceType.DYNAMIC.value:
             return f"https://t.bilibili.com/{oid}"
+        elif type_ == ResourceType.DYNAMIC_DRAW.value:
+            return f"https://h.bilibili.com/{oid}"
+        else:
+            return ""
 
     @staticmethod
     def abstract_text(text: str, length: int) -> str:
