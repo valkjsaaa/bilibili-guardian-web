@@ -23,6 +23,8 @@ class Comment(db.Model):
     like = Column(Integer)  # 点赞数目
     guardian_status = Column(Integer)  # 守护状态
     raw = Column(Text)  # 原始 JSON
+    root = Column(Integer)  # 根评论
+    parent = Column(Integer)  # 回复的评论
 
     def create_time_utc8(self):
         return self.ctime + timedelta(hours=8)
@@ -49,7 +51,7 @@ class Comment(db.Model):
 
     @staticmethod
     def get_link(type_: int, oid: int, rpid: int) -> str:
-        return Comment.get_object_link(type_, oid, rpid) + "#reply{rpid}"
+        return Comment.get_object_link(type_, oid, rpid) + f"#reply{rpid}"
 
     @staticmethod
     def get_object_link(type_: int, oid: int, rpid: int) -> str:
@@ -84,5 +86,7 @@ class Comment(db.Model):
         self.ctime = datetime.utcfromtimestamp(user_json['ctime'])
         self.rcount = user_json['rcount']
         self.like = user_json['like']
-        self.guardian_status = 0
+        self.root = user_json['root']
+        self.parent = user_json['parent']
+        self.guardian_status = 1
         self.raw = json.dumps(user_json)

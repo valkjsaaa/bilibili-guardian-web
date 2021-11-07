@@ -3,9 +3,8 @@ import os
 from datetime import datetime
 
 from bilibili_api.comment import ResourceType
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, Response
 from flask_cors import CORS, cross_origin
-from flask_script import Manager
 
 from config import Config
 from dataset import db, Comment
@@ -46,13 +45,50 @@ def comments():  # put application's code here
     )
 
 
+@cross_origin()
+@app.route('/try_delete_comment', methods=['POST'])
+def try_delete_comment():
+    rpid = request.form.get('rpid')
+    comment = Comment.query.get(rpid)
+    if comment is None:
+        return Response('{"message":"未能找到对应评论"}', status=404, mimetype='application/json')
+    else:
+        if comment.guardian_status not in [0, 1]:
+            return Response('{"message":"评论已被删除或正在被删除"}', status=304, mimetype='application/json')
+        else:
+            comment.guardian_status = 2
+            db.session.commit()
+            return Response('{"message":"已经记录"}', status=202, mimetype='application/json')
 
-manager = Manager(app)
 
+@cross_origin()
+@app.route('/bad_users', methods=['GET'])
+def bad_users():  # put application's code here
+    all_deleted_comments = Comment.query.filter(Comment.guardian_status == -1).all()
+    user_count_list = {}
+    for comment in all_deleted_comments:
+        if comment.mid in user_count_list:
+            user_count_list[comment.mid]["count"] += 1
+            user_count_list[comment.mid]["last"] = comment
+        else:
+            user_count_list[comment.mid] = {
+                "count": 1,
+                "last": comment
+            }
 
-@manager.command
-def runserver():
-    app.run()
+    users = [{
+        "uid": user_count["last"].mid,
+        "uname": user_count["last"].mname,
+        "last": user_count["last"].create_time_utc8(),
+        "count": user_count["count"],
+    } for user_count in user_count_list.values()]
+
+    users.sort(key=lambda user: user["count"], reverse=True)
+    return render_template(
+        'bad_users.html',
+        users=users,
+        last_refreshed=datetime.now() - scraper.last_refreshed if scraper.last_refreshed is not None else None
+    )
 
 
 if __name__ == '__main__':
@@ -62,6 +98,8 @@ if __name__ == '__main__':
     parser.add_argument('--video_count', type=int, help="video count")
     parser.add_argument('--dynamic_count', type=int, help="dynamic count")
     parser.add_argument('--max_page', type=int, help="maximum pages to scrap")
+    parser.add_argument('--username', type=str, help="username")
+    parser.add_argument('--password', type=str, help="password")
 
     args = parser.parse_args()
     app.jinja_env.auto_reload = True
@@ -82,6 +120,10 @@ if __name__ == '__main__':
         config_dict['dynamic_count'] = args.dynamic_count
     if args.max_page is not None:
         config_dict['max_page'] = args.max_page
+    if args.username is not None:
+        config_dict['username'] = args.username
+    if args.password is not None:
+        config_dict['password'] = args.password
     if 'URL' in os.environ:
         app.config['SERVER_NAME'] = os.environ['URL']
 
@@ -90,4 +132,4 @@ if __name__ == '__main__':
     scraper.run_scraper()
 
     app.config['PREFERRED_URL_SCHEME'] = 'https'
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001, ssl_context='adhoc')

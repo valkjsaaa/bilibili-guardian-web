@@ -1,4 +1,4 @@
-<html>
+<html lang="zh-cn">
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
@@ -19,24 +19,9 @@
 </script>
 <script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True, _scheme='https') }}" async>
 </script>
+<script src="{{ url_for('static', filename='bilibili-guardian.js', _external=True, _scheme='https') }}">
+</script>
 <script>
-    isBilibili = window.location.href.indexOf("bilibili.com") > -1;
-
-    function getCookie(cname) {
-        let name = cname + "=";
-        let decodedCookie = decodeURIComponent(document.cookie);
-        let ca = decodedCookie.split(';');
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i];
-            while (c.charAt(0) === ' ') {
-                c = c.substring(1);
-            }
-            if (c.indexOf(name) === 0) {
-                return c.substring(name.length, c.length);
-            }
-        }
-        return "";
-    }
 
     function deleteComment(type, oid, rpid, message) {
         const opts = {
@@ -65,13 +50,52 @@
             return response.json();
         }).then(function (data) {
             if (data.code === 0) {
-                let toast = {
-                    title: "成功删除",
-                    message: message,
-                    status: TOAST_STATUS.SUCCESS,
-                    timeout: 5000
-                }
-                Toast.create(toast);
+                fetch('{{ url_for('try_delete_comment', _external=True, _scheme='https') }}', {
+                    method: 'post',
+                    body: "rpid=" + rpid,
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                    }
+                }).then(function (response) {
+                        let toast;
+                        switch (response.status) {
+                            case 202:
+                                toast = {
+                                    title: "成功删除",
+                                    message: message,
+                                    status: TOAST_STATUS.SUCCESS,
+                                    timeout: 5000
+                                }
+                                Toast.create(toast);
+                                break
+                            case 304:
+                                toast = {
+                                    title: "删除过了",
+                                    message: message,
+                                    status: TOAST_STATUS.SUCCESS,
+                                    timeout: 5000
+                                }
+                                break
+                            case 404:
+                                toast = {
+                                    title: "没找到该评论",
+                                    message: message,
+                                    status: TOAST_STATUS.SUCCESS,
+                                    timeout: 5000
+                                }
+                                break
+                            default:
+                                toast = {
+                                    title: "未知服务器错误",
+                                    message: message,
+                                    status: TOAST_STATUS.SUCCESS,
+                                    timeout: 5000
+                                }
+                                break
+                        }
+                        Toast.create(toast);
+                    }
+                )
             } else {
                 let toast = {
                     title: "删除失败",
@@ -83,32 +107,6 @@
             }
         });
     }
-
-    document.addEventListener("DOMContentLoaded", function () {
-        if (!isBilibili) {
-            const all_bilibili_dom = document.getElementsByClassName("bilibili");
-            Array.from(all_bilibili_dom).forEach((element) => {
-                element.remove();
-            })
-        }
-        document.querySelector("body").addEventListener('click', function (e) {
-            const anchor = e.target.closest('a');
-            if (anchor !== null) {
-                if (!anchor.hasAttribute("data-href")) return;
-                if (isBilibili) {
-                    fetch(anchor.dataset.href)
-                        .then(resp => resp.text())
-                        .then(data => {
-                            document.open();
-                            document.write(data);
-                            document.close()
-                        });
-                } else {
-                    window.location.href = anchor.dataset.href;
-                }
-            }
-        }, false);
-    });
 </script>
 <nav class="navbar navbar-expand-sm navbar-light bg-light">
     <div class="container-fluid">
@@ -164,7 +162,7 @@ fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video
     </thead>
     <tbody>
     {% for comment in comments.items %}
-        <tr>
+        <tr {% if comment.guardian_status == 2 %} class="table-danger" {% endif %} >
 
             <th scope="row">{{ comment.oid }}</th>
             <th><a href="{{ comment.get_object_link(comment.type_, comment.oid, comment.rpid) }}"
