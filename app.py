@@ -29,6 +29,7 @@ def comments():  # put application's code here
     per_page = 50
     if type_ == "dynamic":
         page_comments = Comment.query. \
+            filter(Comment.oid != 173883203). \
             filter(Comment.guardian_status != -1). \
             filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
@@ -132,4 +133,4 @@ if __name__ == '__main__':
     scraper.run_scraper()
 
     app.config['PREFERRED_URL_SCHEME'] = 'https'
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001, ssl_context='adhoc')
