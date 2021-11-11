@@ -12,8 +12,7 @@ RUN pip install -r requirements.txt
 
 COPY . /app
 
-CMD mkdir /data/
+RUN mkdir /data/
 
-ENTRYPOINT [ "python3" ]
+ENTRYPOINT [ "python3", "-u", "app.py", "--db", "sqlite:////data/db.sqlite?check_same_thread=False" ]
 
-CMD [ "-u", "app.py", "--db", "sqlite:////data/db.sqlite?check_same_thread=False" ]
