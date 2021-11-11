@@ -133,4 +133,4 @@ if __name__ == '__main__':
     scraper.run_scraper()
 
     app.config['PREFERRED_URL_SCHEME'] = 'https'
-    app.run(host='0.0.0.0', port=5001, ssl_context='adhoc')
+    app.run(host='0.0.0.0', port=5000)
