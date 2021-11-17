@@ -145,26 +145,29 @@ class Scraper:
             if full_scrape:
                 db_comments = [Comment(comment_, oname) for comment_ in comments_time.values()]
                 db_comments += [Comment(comment_, oname) for comment_ in comments_like.values()]
-                earliest_time = min([comment_.ctime for comment_ in db_comments if comment_.root == 0])
+                min_list = [comment_.ctime for comment_ in db_comments if comment_.root == 0]
+                earliest_time = min(min_list) if len(min_list) != 0 else None
             else:
                 db_comments = [Comment(comment_, oname) for comment_ in comments_time.values()]
-                earliest_time = min([comment_.ctime for comment_ in db_comments if comment_.root == 0])
+                min_list = [comment_.ctime for comment_ in db_comments if comment_.root == 0]
+                earliest_time = min(min_list) if len(min_list) != 0 else None
                 db_comments += [Comment(comment_, oname) for comment_ in comments_like.values()]
-            later_comments = Comment.query.filter(
-                Comment.ctime >= earliest_time,
-                Comment.oid == oid,
-                Comment.root == 0
-            ).all()
-            for later_comment in later_comments:
-                if later_comment.rpid not in all_rpid:
-                    later_comment.guardian_status = -1
-                    sub_comments = Comment.query.filter(
-                        Comment.root == later_comment.rpid
-                    ).all()
-                    for comment_ in sub_comments:
-                        comment_.guardian_status = -1
-                else:
-                    later_comment.guardian_status = 1
+            if earliest_time is not None:
+                later_comments = Comment.query.filter(
+                    Comment.ctime >= earliest_time,
+                    Comment.oid == oid,
+                    Comment.root == 0
+                ).all()
+                for later_comment in later_comments:
+                    if later_comment.rpid not in all_rpid:
+                        later_comment.guardian_status = -1
+                        sub_comments = Comment.query.filter(
+                            Comment.root == later_comment.rpid
+                        ).all()
+                        for comment_ in sub_comments:
+                            comment_.guardian_status = -1
+                    else:
+                        later_comment.guardian_status = 1
 
             for sub_comment_rpid, sub_comment_sub_comments_rpids in sub_comments_dict.items():
                 sub_comments = Comment.query.filter(
