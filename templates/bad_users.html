@@ -19,8 +19,10 @@
 </script>
 <script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True, _scheme='https') }}" async>
 </script>
-<script src="{{ url_for('static', filename='bilibili-guardian.js', _external=True, _scheme='https') }}" async>
+<script src="{{ url_for('static', filename='bilibili-guardian.js', _external=True, _scheme='https') }}">
 </script>
+{% include 'script.html' %}
+{% include 'nav.html' %}
 <table class="table table-hover">
     <thead>
     <tr>
@@ -28,6 +30,7 @@
         <th scope="col">用户名</th>
         <th scope="col">被删除的评论数</th>
         <th scope="col">最后一次评论时间</th>
+        <th scope="col" class="bilibili">删除</th>
     </tr>
     </thead>
     <tbody>
@@ -38,6 +41,17 @@
             <th scope="row">{{ user['uname'] }}</th>
             <th scope="row">{{ user['count'] }}</th>
             <th scope="row">{{ user['last'] }}</th>
+            <th scope="col" class="bilibili">
+                {% if user['top_bad'] %}
+                    <button
+                            type="button"
+                            class="btn btn-warning"
+                            onclick="deleteBatch({{ user['comments'] | safe }})"
+                    >
+                        删除 {{ user['comments'] | length }} 条
+                    </button>
+                    </th>
+                {% endif %}
         </tr>
     {% endfor %}
     </tbody>

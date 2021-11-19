@@ -82,12 +82,26 @@ def bad_users():  # put application's code here
         "uname": user_count["last"].mname,
         "last": user_count["last"].create_time_utc8(),
         "count": user_count["count"],
+        "top_bad": False
     } for user_count in user_count_list.values()]
 
     users.sort(key=lambda user: user["count"], reverse=True)
+
+    for user_id, user_obj in enumerate(users[:9]):
+        user_comments = Comment.query. \
+            filter(~Comment.oid.in_([173883203, 174248088])). \
+            filter(Comment.mid == user_obj["uid"]). \
+            filter(Comment.guardian_status.in_([0, 1])). \
+            all()
+        user_comments_json = \
+            [{"type": comment.type_, "oid": str(comment.oid), "rpid": str(comment.rpid)} for comment in user_comments]
+        users[user_id]['comments'] = user_comments_json
+        users[user_id]['top_bad'] = True
+
     return render_template(
         'bad_users.html',
         users=users,
+        type_="bad_users",
         last_refreshed=datetime.now() - scraper.last_refreshed if scraper.last_refreshed is not None else None
     )
 

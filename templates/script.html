@@ -1,0 +1,110 @@
+<script>
+    async function deleteComment(type, oid, rpid, message = null) {
+        var success = false;
+        const opts = {
+            'type': type,
+            'oid': oid,
+            'rpid': rpid,
+            'csrf': getCookie('bili_jct'),
+            'jsonp': 'jsonp'
+        };
+        console.log(opts);
+        let formBody = [];
+        for (const property in opts) {
+            const encodedKey = encodeURIComponent(property);
+            const encodedValue = encodeURIComponent(opts[property]);
+            formBody.push(encodedKey + "=" + encodedValue);
+        }
+        formBody = formBody.join("&");
+        let data = await fetch('https://api.bilibili.com/x/v2/reply/del', {
+            method: 'post',
+            body: formBody,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            },
+            credentials: 'include'
+        }).then(function (response) {
+            return response.json();
+        });
+        if (data.code === 0) {
+            await fetch('{{ url_for('try_delete_comment', _external=True, _scheme='https') }}', {
+                method: 'post',
+                body: "rpid=" + rpid,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+                }
+            }).then(function (response) {
+                    let toast;
+                    switch (response.status) {
+                        case 202:
+                            toast = {
+                                title: "成功删除",
+                                message: message,
+                                status: TOAST_STATUS.SUCCESS,
+                                timeout: 5000
+                            }
+                            success = true;
+                            break
+                        case 304:
+                            toast = {
+                                title: "删除过了",
+                                message: message,
+                                status: TOAST_STATUS.SUCCESS,
+                                timeout: 5000
+                            }
+                            break
+                        case 404:
+                            toast = {
+                                title: "没找到该评论",
+                                message: message,
+                                status: TOAST_STATUS.SUCCESS,
+                                timeout: 5000
+                            }
+                            break
+                        default:
+                            toast = {
+                                title: "未知服务器错误",
+                                message: message,
+                                status: TOAST_STATUS.SUCCESS,
+                                timeout: 5000
+                            }
+                            break
+                    }
+                    if (message != null) {
+                        Toast.create(toast);
+                    }
+                }
+            )
+        } else {
+            let toast = {
+                title: "删除失败",
+                message: `错误代码：${data.code}\n错误信息：${data.message}`,
+                status: TOAST_STATUS.DANGER,
+                timeout: 5000
+            }
+            if (message != null) {
+                Toast.create(toast);
+            }
+        }
+        console.log(success)
+        return success;
+    }
+
+    async function deleteBatch(commentList) {
+        let success_number = 0;
+        let total_number = commentList.length;
+        for (const commentListElement of commentList) {
+            if (await deleteComment(commentListElement.type, commentListElement.oid, commentListElement.rpid)) {
+                success_number += 1;
+            }
+        }
+        const toast = {
+            title: "删除完毕",
+            message: `成功删除 ${success_number} 条评论` +
+                ((total_number === success_number) ? "" : `，失败 ${total_number - success_number} 条`),
+            status: TOAST_STATUS.SUCCESS,
+            timeout: 5000
+        };
+        Toast.create(toast);
+    }
+</script>

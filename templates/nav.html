@@ -1,0 +1,44 @@
+<nav class="navbar navbar-expand-sm navbar-light bg-light">
+    <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                {% for nav_type, nav_name in [("video", "视频评论"), ("dynamic", "动态评论"), ("bad_users", "黑粉名单")] %}
+                    <li class="nav-item">
+                        {% if nav_type == "bad_users" %}
+                            {% set url = url_for('bad_users', _external=True, _scheme='https') %}
+                        {% else %}
+                            {% set url = url_for('comments', _external=True, _scheme='https', pn=1, type=nav_type) %}
+                        {% endif %}
+                        {% if nav_type == type_ %}
+                            <a class="nav-link active" aria-current="page" href="#" data-href="{{ url }}">
+                        {% else %}
+                            <a class=" nav-link" href="#" data-href="{{ url }}">
+                        {% endif %}
+                        {{ nav_name }}
+                        </a>
+                    </li>
+                {% endfor %}
+                <li>
+                    <a class="nav-link" href="javascript:(function(){ if(window.location.href.indexOf('bilibili.com') > -1) {
+fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video") }}')
+  .then(resp => resp.text())
+  .then(data => {document.open();document.write(data);document.close()});
+  } else {
+  alert('请在B站点击此书签');
+  }})()">一键删除书签</a>
+                </li>
+            </ul>
+            <span class="navbar-text">
+                {% if last_refreshed != None %}
+                    上次刷新 {{ last_refreshed.total_seconds() }} 秒前
+                {% else %}
+                    等待首次刷新
+                {% endif %}
+            </span>
+        </div>
+    </div>
+</nav>
