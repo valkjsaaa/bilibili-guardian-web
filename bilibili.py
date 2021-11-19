@@ -19,7 +19,7 @@ banner = r"""
 """
 
 import base64
-import chardet
+import cchardet as chardet
 import functools
 import hashlib
 import json

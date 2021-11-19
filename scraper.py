@@ -110,6 +110,7 @@ class Scraper:
                         continue
                     comments_dict[comment_['rpid']] = comment_
                     sub_comment_ids = []
+                    scraped_sub_comments = False
                     if comment_['rcount'] > len(comment_['replies']):
                         comment_bilibili = comment.Comment(comment_['oid'], ResourceType(comment_['type']),
                                                            comment_['rpid'], credential=self.config.credential)
@@ -124,6 +125,7 @@ class Scraper:
                                 sub_comment_ids = []
                                 break
                             if sub_comments['replies'] is None:
+                                scraped_sub_comments = True
                                 break
                             for sub_comment in sub_comments['replies']:
                                 comments_dict[sub_comment['rpid']] = sub_comment
@@ -133,7 +135,8 @@ class Scraper:
                         for sub_comment in comment_['replies']:
                             comments_dict[sub_comment['rpid']] = sub_comment
                             sub_comment_ids += [sub_comment['rpid']]
-                    if len(sub_comment_ids) > 0:
+                        scraped_sub_comments = True
+                    if scraped_sub_comments:
                         sub_comments_dict[comment_['rpid']] = sub_comment_ids
 
                 if len(new_comments) == 0:

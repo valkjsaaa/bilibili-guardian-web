@@ -6,8 +6,7 @@ Flask-Cors~=3.0.10
 SQLAlchemy~=1.4.26
 aiohttp~=3.7.4.post0
 tqdm~=4.62.3
-
-chardet~=3.0.4
-requests~=2.21.0
+cchardet~=2.1.7
+requests~=2.26.0
 rsa~=4.7.2
 toml~=0.10.2
