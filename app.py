@@ -89,7 +89,7 @@ def bad_users():  # put application's code here
 
     for user_id, user_obj in enumerate(users[:9]):
         user_comments = Comment.query. \
-            filter(~Comment.oid.in_([173883203, 174248088])). \
+            filter(~Comment.oid.in_([173883203, 174248088, 596547592802402798])). \
             filter(Comment.mid == user_obj["uid"]). \
             filter(Comment.guardian_status.in_([0, 1])). \
             all()

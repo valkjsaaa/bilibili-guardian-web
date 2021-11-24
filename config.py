@@ -10,7 +10,7 @@ class Config:
     max_page: int
     url: str
 
-    def __init__(self, user=941228, video_count=200, dynamic_count=300, max_page=10, username=None, password=None):
+    def __init__(self, user=941228, video_count=50, dynamic_count=50, max_page=10, username=None, password=None):
         self.user = user
         self.video_count = video_count
         self.dynamic_count = dynamic_count
