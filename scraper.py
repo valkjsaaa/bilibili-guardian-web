@@ -252,7 +252,8 @@ class Scraper:
             dynamic_type = dynamic_['desc']['type']
             # dynamic_type 见 https://github.com/SocialSisterYi/bilibili-API-collect/issues/143
             if dynamic_type == 1:
-                return f"{dynamic_['card']['item']['content']}：转发\"{dynamic_['card']['origin_user']['info']['uname']}\""
+                uname = dynamic_['card']['origin_user']['info']['uname'] if 'origin_user' in dynamic_['card'] else "未知用户"
+                return f"{dynamic_['card']['item']['content']}：转发\"{uname}\""
             elif dynamic_type == 2:
                 return dynamic_['card']['item']['description']
             elif dynamic_type == 4:

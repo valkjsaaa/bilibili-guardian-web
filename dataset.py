@@ -42,11 +42,12 @@ class Comment(db.Model):
             return "未知"
 
     def object_desc(self):
-        if self.type_ == ResourceType.VIDEO:
+        resource_type = ResourceType(self.type_)
+        if resource_type == ResourceType.VIDEO:
             return f"{self.type_name()} av{self.oid}"
-        elif self.type_ == ResourceType.ARTICLE:
+        elif resource_type == ResourceType.ARTICLE:
             return f"{self.type_name()} {self.oid}"
-        elif self.type_ in [ResourceType.DYNAMIC, ResourceType.DYNAMIC_DRAW]:
+        elif resource_type in [ResourceType.DYNAMIC, ResourceType.DYNAMIC_DRAW]:
             return f"{self.type_name()} {self.oid}"
 
     @staticmethod
