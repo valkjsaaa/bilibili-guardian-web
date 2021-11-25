@@ -16,6 +16,7 @@ from flask_sqlalchemy import SQLAlchemy
 from config import Config
 from dataset import Comment
 
+DISPLAY_BEFORE_TIMESTAMP = 1636611395
 
 async def retries(f, times=5):
     for i in range(times):
@@ -42,6 +43,9 @@ class Scraper:
         self.wait_time = 0
         self.wait_level = 0
         self.first_trial = False
+
+        self.new_video_oids = []
+        self.new_dynamic_oids = []
 
     async def allow_blocked(self, f):
         current_time = datetime.now()
@@ -85,6 +89,38 @@ class Scraper:
             pn += 1
 
         recent_videos = videos[:min(self.config.video_count, len(videos))]
+
+        self.new_video_oids = [video["aid"] for video in videos if video['created'] > DISPLAY_BEFORE_TIMESTAMP]
+
+        dynamics = []
+        pn = 1
+        offset = 0
+        while True:
+            current_dynamics_result = await retries(lambda: user_obj.get_dynamics(offset=offset))
+            if len(current_dynamics_result['cards']) == 0:
+                break
+            offset = current_dynamics_result['next_offset']
+            current_dynamics = current_dynamics_result['cards']
+            filtered_current_dynamics = [
+                dynamic_
+                for dynamic_ in current_dynamics
+                if dynamic_['desc']['type'] != 8
+            ]
+            dynamics += filtered_current_dynamics
+            if len(dynamics) >= self.config.dynamic_count:
+                break
+            pn += 1
+
+        recent_dynamics = dynamics[:min(self.config.dynamic_count, len(dynamics))]
+
+        def dynamic_oid(dynamic_: {}):
+            dynamic_type = dynamic_['desc']['type']
+            if dynamic_type == 2:
+                return dynamic_["desc"]['rid']
+            else:
+                return dynamic_["desc"]['dynamic_id']
+
+        self.new_dynamic_oids = [dynamic_oid(dynamic) for dynamic in dynamics if dynamic['desc']['timestamp'] > DISPLAY_BEFORE_TIMESTAMP]
 
         async def get_comments(
                 oid: int,
@@ -212,24 +248,6 @@ class Scraper:
                 full_scrape_time and full_scrape_like
             )
 
-        dynamics = []
-        pn = 1
-        offset = 0
-        while True:
-            current_dynamics_result = await retries(lambda: user_obj.get_dynamics(offset=offset))
-            if len(current_dynamics_result['cards']) == 0:
-                break
-            current_dynamics = current_dynamics_result['cards']
-            filtered_current_dynamics = [
-                dynamic_
-                for dynamic_ in current_dynamics
-                if dynamic_['desc']['type'] != 8
-            ]
-            dynamics += filtered_current_dynamics
-            if len(dynamics) >= self.config.dynamic_count:
-                break
-            pn += 1
-
         def dynamic_desc(dynamic_: {}) -> str:
             dynamic_type = dynamic_['desc']['type']
             # dynamic_type 见 https://github.com/SocialSisterYi/bilibili-API-collect/issues/143
@@ -246,15 +264,6 @@ class Scraper:
                 return ResourceType.DYNAMIC_DRAW
             else:
                 return ResourceType.DYNAMIC
-
-        def dynamic_oid(dynamic_: {}):
-            dynamic_type = dynamic_['desc']['type']
-            if dynamic_type == 2:
-                return dynamic["desc"]['rid']
-            else:
-                return dynamic["desc"]['dynamic_id']
-
-        recent_dynamics = dynamics[:min(self.config.dynamic_count, len(dynamics))]
 
         for dynamic in tqdm.tqdm(recent_dynamics):
             dynamic_comments_time, dynamic_sub_comments_time, full_scrape_time = await get_comments(
