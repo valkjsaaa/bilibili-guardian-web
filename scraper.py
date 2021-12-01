@@ -21,6 +21,7 @@ DISPLAY_BEFORE_TIMESTAMP = 1636611395
 async def retries(f, times=5):
     for i in range(times):
         try:
+            await asyncio.sleep(1)
             return await f()
         except aiohttp.client_exceptions.ServerDisconnectedError:
             print(f"服务器端开链接，重试第{i + 1}次...")
@@ -51,6 +52,7 @@ class Scraper:
         current_time = datetime.now()
         if self.last_block is None or current_time - self.last_block < timedelta(seconds=self.wait_time):
             try:
+                await asyncio.sleep(1)
                 result = await f()
                 if self.first_trial:
                     self.wait_level -= 1
