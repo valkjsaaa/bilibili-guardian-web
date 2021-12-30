@@ -29,7 +29,6 @@ def comments():  # put application's code here
     per_page = 50
     if type_ == "dynamic":
         page_comments = Comment.query. \
-            filter(~Comment.oid.in_(scraper.new_video_oids + scraper.new_dynamic_oids)). \
             filter(Comment.guardian_status != -1). \
             filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
