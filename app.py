@@ -114,6 +114,8 @@ if __name__ == '__main__':
     parser.add_argument('--max_page', type=int, help="maximum pages to scrap")
     parser.add_argument('--username', type=str, help="username")
     parser.add_argument('--password', type=str, help="password")
+    parser.add_argument('--sessdata', type=str, help="sessdata")
+    parser.add_argument('--bili_jct', type=str, help="bili_jct")
 
     args = parser.parse_args()
     app.jinja_env.auto_reload = True
@@ -138,6 +140,10 @@ if __name__ == '__main__':
         config_dict['username'] = args.username
     if args.password is not None:
         config_dict['password'] = args.password
+    if args.sessdata is not None:
+        config_dict['sessdata'] = args.sessdata
+    if args.bili_jct is not None:
+        config_dict['bili_jct'] = args.bili_jct
     if 'URL' in os.environ:
         app.config['SERVER_NAME'] = os.environ['URL']
 
