@@ -149,31 +149,32 @@ class Scraper:
                     comments_dict[comment_['rpid']] = comment_
                     sub_comment_ids = []
                     scraped_sub_comments = False
-                    if comment_['rcount'] > len(comment_['replies']):
-                        comment_bilibili = comment.Comment(comment_['oid'], ResourceType(comment_['type']),
-                                                           comment_['rpid'], credential=self.config.credential)
-                        j = 1
-                        while True:
-                            sub_comments = await retries(
-                                lambda: self.allow_blocked(
-                                    lambda: comment_bilibili.get_sub_comments(page_index=j)
+                    if comment_['replies'] is not None:
+                        if comment_['rcount'] > len(comment_['replies']):
+                            comment_bilibili = comment.Comment(comment_['oid'], ResourceType(comment_['type']),
+                                                               comment_['rpid'], credential=self.config.credential)
+                            j = 1
+                            while True:
+                                sub_comments = await retries(
+                                    lambda: self.allow_blocked(
+                                        lambda: comment_bilibili.get_sub_comments(page_index=j)
+                                    )
                                 )
-                            )
-                            if sub_comments is None:
-                                sub_comment_ids = []
-                                break
-                            if sub_comments['replies'] is None:
-                                scraped_sub_comments = True
-                                break
-                            for sub_comment in sub_comments['replies']:
+                                if sub_comments is None:
+                                    sub_comment_ids = []
+                                    break
+                                if sub_comments['replies'] is None:
+                                    scraped_sub_comments = True
+                                    break
+                                for sub_comment in sub_comments['replies']:
+                                    comments_dict[sub_comment['rpid']] = sub_comment
+                                    sub_comment_ids += [sub_comment['rpid']]
+                                j += 1
+                        else:
+                            for sub_comment in comment_['replies']:
                                 comments_dict[sub_comment['rpid']] = sub_comment
                                 sub_comment_ids += [sub_comment['rpid']]
-                            j += 1
-                    else:
-                        for sub_comment in comment_['replies']:
-                            comments_dict[sub_comment['rpid']] = sub_comment
-                            sub_comment_ids += [sub_comment['rpid']]
-                        scraped_sub_comments = True
+                            scraped_sub_comments = True
                     if scraped_sub_comments:
                         sub_comments_dict[comment_['rpid']] = sub_comment_ids
 
