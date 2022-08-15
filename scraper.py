@@ -30,6 +30,11 @@ async def retries(f, times=5):
         except exceptions.NetworkException:
             print(f"接口被屏蔽，重试第{i + 1}次...")
             await asyncio.sleep(120 * (2 ** i))
+        except exceptions.ResponseCodeException as e:
+            if e.code == -404:
+                raise e
+            else:
+                print(f"错误代码{e.code}，重试第{i + 1}次...")
 
 
 class Scraper:
@@ -137,11 +142,15 @@ class Scraper:
             comments_dict = {}
             sub_comments_dict = {}
             for i in range(max_page):
-                new_comments_result = \
-                    await retries(lambda:
-                                  comment.get_comments(oid, type_=type_, page_index=i + 1, order=order,
-                                                       credential=self.config.credential)
-                                  )
+                try:
+                    new_comments_result = \
+                        await retries(lambda:
+                                      comment.get_comments(oid, type_=type_, page_index=i + 1, order=order,
+                                                           credential=self.config.credential)
+                                      )
+                except exceptions.ResponseCodeException as e:
+                    print(f"错误代码{e.code}，停止抓取")
+                    break
                 new_comments = new_comments_result['replies']
                 for comment_ in new_comments:
                     if comment_['rpid'] in ignore_list:
@@ -155,11 +164,16 @@ class Scraper:
                                                                comment_['rpid'], credential=self.config.credential)
                             j = 1
                             while True:
-                                sub_comments = await retries(
-                                    lambda: self.allow_blocked(
-                                        lambda: comment_bilibili.get_sub_comments(page_index=j)
+                                try:
+                                    sub_comments = await retries(
+                                        lambda: self.allow_blocked(
+                                            lambda: comment_bilibili.get_sub_comments(page_index=j)
+                                        )
                                     )
-                                )
+                                except Exception as e:
+                                    print(f"获取子评论失败：{e}")
+                                    print(traceback.format_exc())
+                                    sub_comments = None
                                 if sub_comments is None:
                                     sub_comment_ids = []
                                     break
