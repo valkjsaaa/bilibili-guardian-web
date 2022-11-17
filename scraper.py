@@ -143,15 +143,21 @@ class Scraper:
             sub_comments_dict = {}
             for i in range(max_page):
                 try:
-                    new_comments_result = \
+                    async def get_comment():
+                        _new_comments_result = await comment.get_comments(oid, type_=type_, page_index=i + 1, order=order,
+                                             credential=self.config.credential)
+                        _new_comments = _new_comments_result['replies']
+                        if _new_comments is None:
+                            print(f"评论获取失败，oid={oid}, type={type_}, page={i + 1}, order={order}")
+                            raise exceptions.NetworkException(-1, "replies is None")
+                        return _new_comments
+                    new_comments = \
                         await retries(lambda:
-                                      comment.get_comments(oid, type_=type_, page_index=i + 1, order=order,
-                                                           credential=self.config.credential)
+                                      get_comment()
                                       )
                 except exceptions.ResponseCodeException as e:
                     print(f"错误代码{e.code}，停止抓取")
                     break
-                new_comments = new_comments_result['replies']
                 for comment_ in new_comments:
                     if comment_['rpid'] in ignore_list:
                         continue
