@@ -152,6 +152,8 @@ class Scraper:
                     print(f"错误代码{e.code}，停止抓取")
                     break
                 new_comments = new_comments_result['replies']
+                if new_comments is None:
+                    new_comments = []
                 for comment_ in new_comments:
                     if comment_['rpid'] in ignore_list:
                         continue
