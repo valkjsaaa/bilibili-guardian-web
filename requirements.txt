@@ -1,4 +1,4 @@
-bilibili-api~=8.3.1
+git+https://github.com/valkjsaaa/bilibili_api.git@255c64b3aba82d3c9f7f5685607aa9ec2b930acc
 Flask~=2.0.2
 Flask-Script~=2.0.6
 Flask-SQLAlchemy~=2.5.1
