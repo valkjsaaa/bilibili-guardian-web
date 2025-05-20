@@ -1,6 +1,7 @@
 import argparse
 import os
-from datetime import datetime
+import ssl
+from datetime import datetime, timedelta
 
 from bilibili_api.comment import CommentResourceType
 from flask import Flask, render_template, request, Response
@@ -13,6 +14,54 @@ from scraper import Scraper
 app = Flask(__name__)
 cors = CORS(app)
 config: Config
+
+
+def get_statistics():
+    """Get statistics for the dashboard"""
+    stats = {
+        'last_refreshed': datetime.now() - scraper.last_refreshed if scraper.last_refreshed else None,
+        'total_comments': Comment.query.count(),
+        'video_comments': Comment.query.filter_by(type_=CommentResourceType.VIDEO.value).count(),
+        'dynamic_comments': Comment.query.filter(Comment.type_.in_([
+            CommentResourceType.DYNAMIC.value, CommentResourceType.DYNAMIC_DRAW.value
+        ])).count(),
+        'flagged_comments': Comment.query.filter(Comment.guardian_status == 2).count(),
+        'deleted_comments': Comment.query.filter(Comment.guardian_status == -1).count(),
+    }
+    
+    # 爬虫的评论处理速率
+    if hasattr(scraper, 'scraper_stats'):
+        stats['comments_per_second'] = scraper.scraper_stats.get('comment_rate', 0)
+        stats['videos_per_minute'] = scraper.scraper_stats.get('video_rate', 0)
+        
+        # 添加最近30分钟的处理统计
+        if hasattr(scraper, 'comment_records'):
+            total_recent_comments = sum(record[0] for record in scraper.comment_records)
+            stats['recent_comments'] = total_recent_comments
+        else:
+            stats['recent_comments'] = 0
+            
+        if hasattr(scraper, 'video_records'):
+            total_recent_videos = sum(record[0] for record in scraper.video_records)
+            stats['recent_videos'] = total_recent_videos
+        else:
+            stats['recent_videos'] = 0
+    else:
+        stats['comments_per_second'] = 0
+        stats['videos_per_minute'] = 0
+        stats['recent_comments'] = 0
+        stats['recent_videos'] = 0
+    
+    # Calculate unique content stats
+    stats['unique_videos'] = db.session.query(Comment.oid).filter_by(type_=CommentResourceType.VIDEO.value).distinct().count()
+    stats['unique_dynamics'] = db.session.query(Comment.oid).filter(Comment.type_.in_([
+        CommentResourceType.DYNAMIC.value, CommentResourceType.DYNAMIC_DRAW.value
+    ])).distinct().count()
+    
+    # Get unique commenters
+    stats['unique_users'] = db.session.query(Comment.mid).distinct().count()
+    
+    return stats
 
 
 @cross_origin()
@@ -37,11 +86,15 @@ def comments():  # put application's code here
             filter(Comment.guardian_status != -1). \
             filter_by(type_=CommentResourceType.VIDEO.value). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
+    
+    stats = get_statistics()
+    
     return render_template(
         'comments.html',
         comments=page_comments,
         type_=type_,
-        last_refreshed=datetime.now() - scraper.last_refreshed if scraper.last_refreshed is not None else None
+        last_refreshed=stats['last_refreshed'],
+        stats=stats
     )
 
 
@@ -96,13 +149,89 @@ def bad_users():  # put application's code here
             [{"type": comment.type_, "oid": str(comment.oid), "rpid": str(comment.rpid)} for comment in user_comments]
         users[user_id]['comments'] = user_comments_json
         users[user_id]['top_bad'] = True
-
+    
+    stats = get_statistics()
+    
     return render_template(
         'bad_users.html',
         users=users,
         type_="bad_users",
-        last_refreshed=datetime.now() - scraper.last_refreshed if scraper.last_refreshed is not None else None
+        last_refreshed=stats['last_refreshed'],
+        stats=stats
     )
+
+
+def generate_ssl_context(cert_dir="ssl"):
+    """Generate a self-signed SSL certificate if it doesn't exist"""
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    import datetime
+    
+    # Create directory if it doesn't exist
+    if not os.path.exists(cert_dir):
+        os.makedirs(cert_dir)
+    
+    cert_file = os.path.join(cert_dir, "cert.pem")
+    key_file = os.path.join(cert_dir, "key.pem")
+    
+    # Check if files already exist
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        print(f"Using existing SSL certificate: {cert_file} and key: {key_file}")
+        return (cert_file, key_file)
+    
+    # Generate a new key and certificate
+    print("Generating self-signed SSL certificate...")
+    
+    # Generate private key
+    key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    
+    # Write private key
+    with open(key_file, "wb") as f:
+        f.write(key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        ))
+    
+    # Generate a certificate
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, u"CN"),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Beijing"),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, u"Beijing"),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Bilibili Guardian"),
+        x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+    ])
+    
+    cert = x509.CertificateBuilder().subject_name(
+        subject
+    ).issuer_name(
+        issuer
+    ).public_key(
+        key.public_key()
+    ).serial_number(
+        x509.random_serial_number()
+    ).not_valid_before(
+        datetime.datetime.utcnow()
+    ).not_valid_after(
+        # Our certificate will be valid for 1 year
+        datetime.datetime.utcnow() + datetime.timedelta(days=365)
+    ).add_extension(
+        x509.SubjectAlternativeName([x509.DNSName(u"localhost")]),
+        critical=False,
+    ).sign(key, hashes.SHA256())
+    
+    # Write certificate
+    with open(cert_file, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+    
+    print(f"SSL certificate generated: {cert_file} and key: {key_file}")
+    return (cert_file, key_file)
 
 
 if __name__ == '__main__':
@@ -117,6 +246,8 @@ if __name__ == '__main__':
     parser.add_argument('--sessdata', type=str, help="sessdata")
     parser.add_argument('--bili_jct', type=str, help="bili_jct")
     parser.add_argument('--buvid3', type=str, help="buvid3 cookie")
+    parser.add_argument('--https', action='store_true', help="enable HTTPS with self-signed certificate")
+    parser.add_argument('--port', type=int, default=5000, help="port to run server on")
 
     args = parser.parse_args()
     app.jinja_env.auto_reload = True
@@ -153,8 +284,6 @@ if __name__ == '__main__':
     config = Config(**config_dict)
     scraper = Scraper(config, db, app)
     
-    app.config['PREFERRED_URL_SCHEME'] = 'https'
-    
     # Use asyncio to run Flask properly with the new scraper setup
     import asyncio
     from werkzeug.serving import run_simple
@@ -163,4 +292,14 @@ if __name__ == '__main__':
     scraper.run_scraper()
     
     # Run Flask with the existing event loop
-    run_simple('0.0.0.0', 5000, app, use_reloader=False, threaded=True)
+    ssl_context = None
+    if args.https:
+        try:
+            # Try to generate or use existing SSL certificate
+            ssl_context = generate_ssl_context()
+            print(f"HTTPS enabled on port {args.port}")
+        except Exception as e:
+            print(f"Error setting up HTTPS: {e}")
+            print("Falling back to HTTP")
+    
+    run_simple('0.0.0.0', args.port, app, use_reloader=False, threaded=True, ssl_context=ssl_context)

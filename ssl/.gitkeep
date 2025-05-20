@@ -1,0 +1,2 @@
+# This file exists to ensure the ssl directory is tracked by git
+# SSL certificates will be generated dynamically at runtime 

@@ -1,22 +1,23 @@
-<nav class="navbar navbar-expand-sm navbar-light bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
+        <a class="navbar-brand" href="#">哔哩哔哩评论守护</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
                 aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 {% for nav_type, nav_name in [("video", "视频评论"), ("dynamic", "动态评论"), ("bad_users", "黑粉名单")] %}
                     <li class="nav-item">
                         {% if nav_type == "bad_users" %}
-                            {% set url = url_for('bad_users', _external=True, _scheme='https') %}
+                            {% set url = url_for('bad_users', _external=True) %}
                         {% else %}
-                            {% set url = url_for('comments', _external=True, _scheme='https', pn=1, type=nav_type) %}
+                            {% set url = url_for('comments', _external=True, pn=1, type=nav_type) %}
                         {% endif %}
                         {% if nav_type == type_ %}
                             <a class="nav-link active" aria-current="page" href="#" data-href="{{ url }}">
                         {% else %}
-                            <a class=" nav-link" href="#" data-href="{{ url }}">
+                            <a class="nav-link" href="#" data-href="{{ url }}">
                         {% endif %}
                         {{ nav_name }}
                         </a>
@@ -24,7 +25,7 @@
                 {% endfor %}
                 <li>
                     <a class="nav-link" href="javascript:(function(){ if(window.location.href.indexOf('bilibili.com') > -1) {
-fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video") }}')
+fetch('{{ url_for('comments', _external=True, pn=1, type="video") }}')
   .then(resp => resp.text())
   .then(data => {document.open();document.write(data);document.close()});
   } else {
@@ -32,13 +33,13 @@ fetch('{{ url_for('comments', _external=True, _scheme='https', pn=1, type="video
   }})()">一键删除书签</a>
                 </li>
             </ul>
-            <span class="navbar-text">
+            <div class="navbar-text">
                 {% if last_refreshed != None %}
-                    上次刷新 {{ last_refreshed.total_seconds() }} 秒前
+                    上次刷新: {{ last_refreshed.total_seconds()|round|int }} 秒前
                 {% else %}
                     等待首次刷新
                 {% endif %}
-            </span>
+            </div>
         </div>
     </div>
 </nav>

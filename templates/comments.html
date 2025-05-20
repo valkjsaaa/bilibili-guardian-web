@@ -5,77 +5,238 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <!-- Bootstrap CSS -->
-    <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True, _scheme='https') }}" rel="stylesheet"
+    <link href="{{ url_for('static', filename='bootstrap.min.css', _external=True) }}" rel="stylesheet"
           integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
-    <link href="{{ url_for('static', filename='bootstrap-toaster.min.css', _external=True, _scheme='https') }}"
+    <link href="{{ url_for('static', filename='bootstrap-toaster.min.css', _external=True) }}"
           rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .table {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .table thead {
+            background-color: #343a40;
+            color: white;
+        }
+        .stats-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .pagination {
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .btn-delete {
+            border-radius: 20px;
+        }
+        .comment-content {
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .comment-content:hover {
+            white-space: normal;
+            overflow: visible;
+        }
+    </style>
 
-    <title>最新评论</title>
+    <title>哔哩哔哩评论守护 - 评论监控</title>
 </head>
 <body>
-<script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True, _scheme='https') }}"
+<script src="{{ url_for('static', filename='bootstrap.bundle.min.js', _external=True) }}"
         integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p"
         crossorigin="anonymous" async>
 </script>
-<script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True, _scheme='https') }}" async>
+<script src="{{ url_for('static', filename='bootstrap-toaster.min.js', _external=True) }}" async>
 </script>
-<script src="{{ url_for('static', filename='bilibili-guardian.js', _external=True, _scheme='https') }}">
+<script src="{{ url_for('static', filename='bilibili-guardian.js', _external=True) }}">
 </script>
 {% include 'script.html' %}
 {% include 'nav.html' %}
+
+<!-- Compact Statistics Dashboard -->
+<div class="container-fluid bg-light py-2 mb-3">
+    <div class="row g-2 text-center">
+        <!-- System Status -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-primary text-white">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>系统状态</small>
+                        <strong>
+                            {% if last_refreshed != None %}
+                                {{ last_refreshed.total_seconds()|round|int }}秒前
+                            {% else %}
+                                等待刷新
+                            {% endif %}
+                        </strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Comments Rate -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-info text-white">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>评论处理速率</small>
+                        <strong>{{ stats.comments_per_second }}条/秒</strong>
+                        <small class="mt-1">30分钟: {{ stats.recent_comments }}条</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Videos Rate -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-warning text-dark">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>爬取视频速率</small>
+                        <strong>{{ stats.videos_per_minute }}个/分</strong>
+                        <small class="mt-1">30分钟: {{ stats.recent_videos }}个</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Total Comments -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-success text-white">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>评论总数</small>
+                        <strong>{{ stats.total_comments }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Unique Users -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-secondary text-white">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>独立用户</small>
+                        <strong>{{ stats.unique_users }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Flagged/Deleted -->
+        <div class="col-lg-2 col-md-4 col-6">
+            <div class="card h-100 bg-danger text-white">
+                <div class="card-body p-2">
+                    <div class="d-flex flex-column">
+                        <small>已标记/已删除</small>
+                        <strong>{{ stats.flagged_comments }}/{{ stats.deleted_comments }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="table-responsive">
 <table class="table table-hover">
-    <thead>
+            <thead class="thead-dark">
     <tr>
-        <th scope="col">内容 ID</th>
+                <th scope="col">ID</th>
         <th scope="col">内容标题</th>
-        <th scope="col">用户 ID</th>
-        <th scope="col">用户名</th>
+                <th scope="col">用户</th>
         <th scope="col">评论时间</th>
         <th scope="col">评论内容</th>
-        <th scope="col" class="bilibili">删除</th>
+                <th scope="col" class="bilibili">操作</th>
     </tr>
     </thead>
     <tbody>
     {% for comment in comments.items %}
         <tr {% if comment.guardian_status == 2 %} class="table-danger" {% endif %} >
-
-            <th scope="row">{{ comment.oid }}</th>
-            <th><a href="{{ comment.get_object_link(comment.type_, comment.oid, comment.rpid) }}"
-                   target="_blank">{{ comment.oname }}</a></th>
-            <th>{{ comment.mid }}</th>
-            <th>{{ comment.mname }}</th>
-            <th>{{ comment.create_time_utc8() }}</th>
-            <th><a href="{{ comment.get_link(comment.type_, comment.oid, comment.rpid) }}"
-                   target="_blank">{{ comment.message }}</a></th>
-            <th scope="col" class="bilibili">
+                    <td>{{ comment.oid }}</td>
+                    <td><a href="{{ comment.get_object_link(comment.type_, comment.oid, comment.rpid) }}"
+                        target="_blank" class="text-decoration-none">
+                        <i class="fas fa-{% if comment.type_ == 1 %}video{% else %}comment-dots{% endif %}"></i> 
+                        {{ comment.oname }}
+                    </a></td>
+                    <td>
+                        <span data-bs-toggle="tooltip" title="UID: {{ comment.mid }}">{{ comment.mname }}</span>
+                    </td>
+                    <td>{{ comment.create_time_utc8() }}</td>
+                    <td><div class="comment-content">
+                        <a href="{{ comment.get_link(comment.type_, comment.oid, comment.rpid) }}"
+                        target="_blank" class="text-decoration-none">{{ comment.message }}</a>
+                    </div></td>
+                    <td class="bilibili">
                 <button
                         type="button"
-                        class="btn btn-warning"
-                        onclick='deleteComment(
-                                {{ comment.type_ }},
-                                "{{ comment.oid | string }}",
-                                "{{ comment.rpid | string }}",
-                                {{ comment | string | tojson }}
-                                )'
+                        class="btn btn-warning btn-sm btn-delete"
+                        onclick="deleteComment(
+                                '{{ comment.type_ }}',
+                                '{{ comment.oid | string }}',
+                                '{{ comment.rpid | string }}'
+                        )"
                 >
-                    删除
+                            <i class="fas fa-trash-alt"></i> 删除
                 </button>
-            </th>
+                    </td>
         </tr>
     {% endfor %}
     </tbody>
 </table>
+    </div>
 
+    <nav aria-label="评论分页">
+        <ul class="pagination">
 {% if comments.has_prev %}
-    <a href="#"
-       data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.prev_num, type=type_) }}">&lt;&lt;
-        更新评论</a>{% else %}
-    &lt;&lt; 更新评论{% endif %} |
+                <li class="page-item">
+                    <a class="page-link" href="#" data-href="{{ url_for('comments', _external=True, pn=comments.prev_num, type=type_) }}">
+                        <i class="fas fa-chevron-left"></i> 更新评论
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-chevron-left"></i> 更新评论</span>
+                </li>
+            {% endif %}
+            
+            <li class="page-item disabled">
+                <span class="page-link">第 {{ comments.page }} 页，共 {{ comments.pages }} 页</span>
+            </li>
+            
 {% if comments.has_next %}
-    <a href="#"
-       data-href="{{ url_for('comments', _external=True, _scheme='https', pn=comments.next_num, type=type_) }}">更旧评论
-        &gt;&gt;</a>{% else %}
-    更旧评论 &gt;&gt;{% endif %}
+                <li class="page-item">
+                    <a class="page-link" href="#" data-href="{{ url_for('comments', _external=True, pn=comments.next_num, type=type_) }}">
+                        更旧评论 <i class="fas fa-chevron-right"></i>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">更旧评论 <i class="fas fa-chevron-right"></i></span>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
 
+<script>
+    // Initialize tooltips
+    document.addEventListener('DOMContentLoaded', function() {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+    });
+</script>
 </body>
 </html>

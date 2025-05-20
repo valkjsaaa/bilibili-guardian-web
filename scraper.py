@@ -55,6 +55,35 @@ class Scraper:
 
         self.new_video_oids = []
         self.new_dynamic_oids = []
+        
+        # 爬虫处理速率统计 - 改进版
+        self.scraper_stats = {
+            'comment_rate': 0,      # 每秒处理评论数
+            'video_rate': 0,        # 每分钟处理视频数
+        }
+        # 记录每批评论数量和时间戳: [(count, timestamp), ...]
+        self.comment_records = [(0, datetime.now())]  # 初始占位记录
+        # 记录每批视频数量和时间戳: [(count, timestamp), ...]
+        self.video_records = [(0, datetime.now())]    # 初始占位记录
+
+        self.recent_videos = []  # Store timestamps for recent video discoveries
+        self.recent_comments = []  # Store timestamps for recent comment discoveries
+
+    # Add a helper method to track new comments
+    def track_new_comment(self):
+        """Track a new comment for rate calculations"""
+        now = datetime.now()
+        self.recent_comments.append(now)
+        # Keep only last 30 minutes of data
+        self.recent_comments = [t for t in self.recent_comments if now - t < timedelta(minutes=30)]
+
+    # Add a helper method to track new videos
+    def track_new_video(self):
+        """Track a new video for rate calculations"""
+        now = datetime.now()
+        self.recent_videos.append(now)
+        # Keep only last 30 minutes of data
+        self.recent_videos = [t for t in self.recent_videos if now - t < timedelta(minutes=30)]
 
     async def allow_blocked(self, f):
         current_time = datetime.now()
@@ -80,6 +109,24 @@ class Scraper:
             return None
 
     async def scrap(self):
+        print("开始抓取")
+        
+        # 刷新统计记录，添加新的起始记录点
+        now = datetime.now()
+        self.comment_records.append((0, now))
+        self.video_records.append((0, now))
+        
+        # 清理旧记录
+        cutoff = now - timedelta(minutes=30)
+        self.comment_records = [r for r in self.comment_records if r[1] >= cutoff]
+        self.video_records = [r for r in self.video_records if r[1] >= cutoff]
+        
+        # Initialize tracking for current scrape session
+        if not hasattr(self, 'recent_comments'):
+            self.recent_comments = []
+        if not hasattr(self, 'recent_videos'):
+            self.recent_videos = []
+        
         user_obj = user.User(self.config.user, credential=self.config.credential)
 
         user_info = await retries(lambda: user_obj.get_user_info())
@@ -279,13 +326,30 @@ class Scraper:
                     else:
                         sub_comment.guardian_status = 1
 
-            # Save new comments to database
+            # 确定新评论和重复评论
             filtered_db_comments = [comment_ for comment_ in db_comments if Comment.query.get(comment_.rpid) is None]
+            duplicate_comments = len(db_comments) - len(filtered_db_comments)
+            
+            # 统计所有处理的评论数（新评论 + 重复评论）
+            total_processed = len(db_comments)
+            
+            # 更新爬虫统计数据 - 记录处理的所有评论数
+            if total_processed > 0:
+                print(f"处理 {total_processed} 条评论（{len(filtered_db_comments)} 条新评论，{duplicate_comments} 条重复评论）")
+                self.update_comment_rate(total_processed)  # 使用总处理数更新速率
+            
+            # 只保存新评论到数据库
             self.db.session.bulk_save_objects(filtered_db_comments)
             self.db.session.commit()
 
         # Process videos and get comments
         for video_data in tqdm.tqdm(recent_videos):
+            # 更新爬虫统计数据 - 记录处理的视频数
+            self.update_video_rate(1)
+            
+            # Track this video
+            self.track_new_video()
+            
             # Get comments sorted by time
             video_comments_time, video_sub_comments_time, full_scrape_time = await get_comments(
                 video_data["aid"],
@@ -398,6 +462,10 @@ class Scraper:
                 full_scrape_like and full_scrape_time
             )
         
+        # 打印当前速率统计
+        print(f"当前爬虫速率: {self.scraper_stats['comment_rate']}条评论/秒, {self.scraper_stats['video_rate']}个视频/分")
+        print(f"最近30分钟记录: {len(self.comment_records)}条评论批次, {len(self.video_records)}条视频批次")
+        
         self.last_refreshed = datetime.now()
 
     async def scraper_loop(self):
@@ -419,17 +487,65 @@ class Scraper:
         import threading
         import asyncio
         
-        # Create background task instead of thread
-        async def start_in_background():
-            # Small delay to allow Flask to start
-            await asyncio.sleep(1)
+        # Create a new event loop for the background thread
+        background_loop = asyncio.new_event_loop()
+        
+        # Define thread function
+        def thread_target():
+            asyncio.set_event_loop(background_loop)
             try:
-                await self.scraper_loop()
+                background_loop.run_until_complete(self.scraper_loop())
             except Exception as e:
                 print(f"Scraper failed: {e}")
+                import traceback
+                print(traceback.format_exc())
         
-        # Get the current event loop - we'll run in the main process
-        loop = asyncio.get_event_loop()
+        # Start background thread
+        scraper_thread = threading.Thread(target=thread_target, daemon=True)
+        scraper_thread.start()
         
-        # Schedule the scraper to run as a background task
-        loop.create_task(start_in_background())
+        print("Scraper background thread started")
+
+    # 新增: 更新评论记录并计算速率
+    def update_comment_rate(self, count):
+        """记录一批评论并更新评论处理速率"""
+        now = datetime.now()
+        
+        # 添加新记录
+        if count > 0:
+            self.comment_records.append((count, now))
+            print(f"记录 {count} 条新评论，时间: {now}")
+        
+        # 清除超过30分钟的记录
+        cutoff = now - timedelta(minutes=30)
+        self.comment_records = [r for r in self.comment_records if r[1] >= cutoff]
+        
+        # 计算最近30分钟的评论总数和最早时间点
+        total_comments = sum(record[0] for record in self.comment_records)
+        if len(self.comment_records) > 1:  # 至少要有初始记录和一条新记录
+            earliest = self.comment_records[0][1]
+            duration = (now - earliest).total_seconds()
+            if duration > 0:
+                self.scraper_stats['comment_rate'] = round(total_comments / duration, 1)
+    
+    # 新增: 更新视频记录并计算速率
+    def update_video_rate(self, count):
+        """记录一批视频并更新视频处理速率"""
+        now = datetime.now()
+        
+        # 添加新记录
+        if count > 0:
+            self.video_records.append((count, now))
+            print(f"记录 {count} 个新视频，时间: {now}")
+        
+        # 清除超过30分钟的记录
+        cutoff = now - timedelta(minutes=30)
+        self.video_records = [r for r in self.video_records if r[1] >= cutoff]
+        
+        # 计算最近30分钟的视频总数和最早时间点
+        total_videos = sum(record[0] for record in self.video_records)
+        if len(self.video_records) > 1:  # 至少要有初始记录和一条新记录
+            earliest = self.video_records[0][1]
+            duration = (now - earliest).total_seconds()
+            if duration > 0:
+                self.scraper_stats['video_rate'] = round(total_videos * 60 / duration, 1)  # 转换为每分钟

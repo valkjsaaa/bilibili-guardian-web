@@ -9,3 +9,4 @@ cchardet~=2.1.7
 requests~=2.26.0
 rsa~=4.7.2
 toml~=0.10.2
+cryptography~=41.0.0
