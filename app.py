@@ -2,7 +2,7 @@ import argparse
 import os
 from datetime import datetime
 
-from bilibili_api.comment import ResourceType
+from bilibili_api.comment import CommentResourceType
 from flask import Flask, render_template, request, Response
 from flask_cors import CORS, cross_origin
 
@@ -30,12 +30,12 @@ def comments():  # put application's code here
     if type_ == "dynamic":
         page_comments = Comment.query. \
             filter(Comment.guardian_status != -1). \
-            filter(Comment.type_.in_([ResourceType.DYNAMIC.value, ResourceType.DYNAMIC_DRAW.value])). \
+            filter(Comment.type_.in_([CommentResourceType.DYNAMIC.value, CommentResourceType.DYNAMIC_DRAW.value])). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
     else:
         page_comments = Comment.query. \
             filter(Comment.guardian_status != -1). \
-            filter_by(type_=ResourceType.VIDEO.value). \
+            filter_by(type_=CommentResourceType.VIDEO.value). \
             order_by(Comment.ctime.desc()).paginate(page, per_page, error_out=False)
     return render_template(
         'comments.html',
@@ -116,6 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('--password', type=str, help="password")
     parser.add_argument('--sessdata', type=str, help="sessdata")
     parser.add_argument('--bili_jct', type=str, help="bili_jct")
+    parser.add_argument('--buvid3', type=str, help="buvid3 cookie")
 
     args = parser.parse_args()
     app.jinja_env.auto_reload = True
@@ -144,6 +145,8 @@ if __name__ == '__main__':
         config_dict['sessdata'] = args.sessdata
     if args.bili_jct is not None:
         config_dict['bili_jct'] = args.bili_jct
+    if args.buvid3 is not None:
+        config_dict['buvid3'] = args.buvid3
     if 'URL' in os.environ:
         app.config['SERVER_NAME'] = os.environ['URL']
 

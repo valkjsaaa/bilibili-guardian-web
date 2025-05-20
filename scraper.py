@@ -8,8 +8,8 @@ from typing import Optional
 
 import aiohttp.client_exceptions
 import tqdm as tqdm
-from bilibili_api import user, comment, exceptions
-from bilibili_api.comment import ResourceType, OrderType
+from bilibili_api import user, comment, exceptions, video
+from bilibili_api.comment import CommentResourceType, OrderType
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
@@ -27,14 +27,17 @@ async def retries(f, times=5):
             print(f"服务器端开链接，重试第{i + 1}次...")
         except asyncio.exceptions.TimeoutError:
             print(f"服务器超时，重试第{i + 1}次...")
-        except exceptions.NetworkException:
-            print(f"接口被屏蔽，重试第{i + 1}次...")
-            await asyncio.sleep(120 * (2 ** i))
-        except exceptions.ResponseCodeException as e:
-            if e.code == -404:
-                raise e
+        except exceptions.ApiException as e:
+            if isinstance(e, exceptions.NetworkException):
+                print(f"接口被屏蔽，重试第{i + 1}次...")
+                await asyncio.sleep(120 * (2 ** i))
+            elif isinstance(e, exceptions.ResponseCodeException):
+                if e.code == -404:
+                    raise e
+                else:
+                    print(f"错误代码{e.code}，重试第{i + 1}次...")
             else:
-                print(f"错误代码{e.code}，重试第{i + 1}次...")
+                print(f"API异常：{e}，重试第{i + 1}次...")
 
 
 class Scraper:
@@ -82,140 +85,178 @@ class Scraper:
         user_info = await retries(lambda: user_obj.get_user_info())
         print(f"载入用户：{user_info['name']}")
 
-        videos = []
-        pn = 1
+        # Get user videos
+        videos_list = []
+        page = 1
         while True:
-            current_videos_result = await retries(lambda: user_obj.get_videos(pn=pn))
-            if len(current_videos_result['list']['vlist']) == 0:
+            video_pagination = await retries(lambda: user_obj.get_videos(pn=page))
+            if not video_pagination['list']['vlist']:
                 break
-            current_videos = current_videos_result['list']['vlist']
-            filtered_current_videos = [video for video in current_videos if video['mid'] == self.config.user]
-            videos += filtered_current_videos
-            if len(videos) >= self.config.video_count:
+            
+            current_videos = video_pagination['list']['vlist']
+            filtered_current_videos = [v for v in current_videos if v['mid'] == self.config.user]
+            videos_list.extend(filtered_current_videos)
+            
+            if len(videos_list) >= self.config.video_count:
                 break
-            pn += 1
+            page += 1
 
-        recent_videos = videos[:min(self.config.video_count, len(videos))]
+        recent_videos = videos_list[:min(self.config.video_count, len(videos_list))]
+        self.new_video_oids = [v["aid"] for v in videos_list if v.get('created', 0) > DISPLAY_BEFORE_TIMESTAMP]
 
-        self.new_video_oids = [video["aid"] for video in videos if video['created'] > DISPLAY_BEFORE_TIMESTAMP]
-
-        dynamics = []
-        pn = 1
+        # Get user dynamics
+        dynamics_list = []
         offset = 0
         while True:
-            current_dynamics_result = await retries(lambda: user_obj.get_dynamics(offset=offset))
-            if len(current_dynamics_result['cards']) == 0:
+            dynamic_pagination = await retries(lambda: user_obj.get_dynamics(offset=offset))
+            if not dynamic_pagination.get('cards', []):
                 break
-            offset = current_dynamics_result['next_offset']
-            current_dynamics = current_dynamics_result['cards']
-            filtered_current_dynamics = [
-                dynamic_
-                for dynamic_ in current_dynamics
-                if dynamic_['desc']['type'] != 8
+                
+            offset = dynamic_pagination.get('next_offset', 0)
+            current_dynamics = dynamic_pagination['cards']
+            filtered_dynamics = [
+                d for d in current_dynamics
+                if d['desc']['type'] != 8  # Filter out specific dynamic types
             ]
-            dynamics += filtered_current_dynamics
-            if len(dynamics) >= self.config.dynamic_count:
+            dynamics_list.extend(filtered_dynamics)
+            
+            if len(dynamics_list) >= self.config.dynamic_count:
                 break
-            pn += 1
 
-        recent_dynamics = dynamics[:min(self.config.dynamic_count, len(dynamics))]
+        recent_dynamics = dynamics_list[:min(self.config.dynamic_count, len(dynamics_list))]
 
-        def dynamic_oid(dynamic_: {}):
+        def dynamic_oid(dynamic_: dict) -> int:
+            """Get the object ID for a dynamic based on its type"""
             dynamic_type = dynamic_['desc']['type']
-            if dynamic_type == 2:
-                return dynamic_["desc"]['rid']
+            if dynamic_type == 2:  # Type 2 is a special case
+                return dynamic_['desc']['rid']
             else:
-                return dynamic_["desc"]['dynamic_id']
+                return dynamic_['desc']['dynamic_id']
 
-        self.new_dynamic_oids = [dynamic_oid(dynamic) for dynamic in dynamics if dynamic['desc']['timestamp'] > DISPLAY_BEFORE_TIMESTAMP]
+        self.new_dynamic_oids = [
+            dynamic_oid(d) for d in dynamics_list 
+            if d['desc'].get('timestamp', 0) > DISPLAY_BEFORE_TIMESTAMP
+        ]
 
         async def get_comments(
                 oid: int,
-                type_: comment.ResourceType,
+                type_: CommentResourceType,
                 max_page: int,
                 order: OrderType,
-                ignore_list: {int} = None
-        ) -> ({int: dict}, {int: [int]}):
+                ignore_list: set = None
+        ) -> tuple:
+            """Fetch comments for a given resource"""
             full_scrape = False
             if ignore_list is None:
-                ignore_list = {}
+                ignore_list = set()
+                
             comments_dict = {}
             sub_comments_dict = {}
+            
             for i in range(max_page):
                 try:
-                    new_comments_result = \
-                        await retries(lambda:
-                                      comment.get_comments(oid, type_=type_, page_index=i + 1, order=order,
-                                                           credential=self.config.credential)
-                                      )
+                    # Get main comments
+                    comments_result = await retries(
+                        lambda: comment.get_comments(
+                            oid=oid, 
+                            type_=type_,
+                            page_index=i + 1, 
+                            order=order,
+                            credential=self.config.credential
+                        )
+                    )
                 except exceptions.ResponseCodeException as e:
                     print(f"错误代码{e.code}，停止抓取")
                     break
-                new_comments = new_comments_result['replies']
-                if new_comments is None:
-                    new_comments = []
-                for comment_ in new_comments:
-                    if comment_['rpid'] in ignore_list:
+                    
+                replies = comments_result.get('replies', []) or []
+                
+                # Process main comments
+                for comment_data in replies:
+                    if comment_data['rpid'] in ignore_list:
                         continue
-                    comments_dict[comment_['rpid']] = comment_
+                        
+                    comments_dict[comment_data['rpid']] = comment_data
                     sub_comment_ids = []
                     scraped_sub_comments = False
-                    if comment_['replies'] is not None:
-                        if comment_['rcount'] > len(comment_['replies']):
-                            comment_bilibili = comment.Comment(comment_['oid'], ResourceType(comment_['type']),
-                                                               comment_['rpid'], credential=self.config.credential)
-                            j = 1
+                    
+                    # Process sub-comments if any
+                    if comment_data.get('replies'):
+                        if comment_data.get('rcount', 0) > len(comment_data['replies']):
+                            # Need to fetch more sub-comments
+                            # Create a Comment object for the specific resource
+                            from bilibili_api import comment as comment_module
+                            comment_obj = comment_module.Comment(
+                                oid=oid,
+                                type_=type_,
+                                rpid=comment_data['rpid'],
+                                credential=self.config.credential
+                            )
+                            
+                            page_index = 1
                             while True:
                                 try:
-                                    sub_comments = await retries(
+                                    sub_comments_result = await retries(
                                         lambda: self.allow_blocked(
-                                            lambda: comment_bilibili.get_sub_comments(page_index=j)
+                                            lambda: comment_obj.get_sub_comments(page_index=page_index)
                                         )
                                     )
                                 except Exception as e:
                                     print(f"获取子评论失败：{e}")
                                     print(traceback.format_exc())
-                                    sub_comments = None
-                                if sub_comments is None:
+                                    sub_comments_result = None
+                                    
+                                if sub_comments_result is None:
                                     sub_comment_ids = []
                                     break
-                                if sub_comments['replies'] is None:
+                                    
+                                subs = sub_comments_result.get('replies', []) or []
+                                if not subs:
                                     scraped_sub_comments = True
                                     break
-                                for sub_comment in sub_comments['replies']:
-                                    comments_dict[sub_comment['rpid']] = sub_comment
-                                    sub_comment_ids += [sub_comment['rpid']]
-                                j += 1
+                                    
+                                for sub in subs:
+                                    comments_dict[sub['rpid']] = sub
+                                    sub_comment_ids.append(sub['rpid'])
+                                    
+                                page_index += 1
                         else:
-                            for sub_comment in comment_['replies']:
-                                comments_dict[sub_comment['rpid']] = sub_comment
-                                sub_comment_ids += [sub_comment['rpid']]
+                            # All sub-comments are already included
+                            for sub in comment_data['replies']:
+                                comments_dict[sub['rpid']] = sub
+                                sub_comment_ids.append(sub['rpid'])
                             scraped_sub_comments = True
+                            
                     if scraped_sub_comments:
-                        sub_comments_dict[comment_['rpid']] = sub_comment_ids
+                        sub_comments_dict[comment_data['rpid']] = sub_comment_ids
 
-                if len(new_comments) == 0:
+                # If no more comments, we've done a full scrape
+                if not replies:
                     full_scrape = True
                     break
+                    
             return comments_dict, sub_comments_dict, full_scrape
 
-        def update_comments(oname: str, oid: int, comments_time: [], comments_like: [], full_scrape=False):
+        def update_comments(oname: str, oid: int, comments_time: dict, comments_like: dict, full_scrape=False):
+            """Update comment records in the database"""
             if full_scrape:
                 db_comments = [Comment(comment_, oname) for comment_ in comments_time.values()]
                 db_comments += [Comment(comment_, oname) for comment_ in comments_like.values()]
                 min_list = [comment_.ctime for comment_ in db_comments if comment_.root == 0]
-                earliest_time = min(min_list) if len(min_list) != 0 else None
+                earliest_time = min(min_list) if min_list else None
             else:
                 db_comments = [Comment(comment_, oname) for comment_ in comments_time.values()]
                 min_list = [comment_.ctime for comment_ in db_comments if comment_.root == 0]
-                earliest_time = min(min_list) if len(min_list) != 0 else None
+                earliest_time = min(min_list) if min_list else None
                 db_comments += [Comment(comment_, oname) for comment_ in comments_like.values()]
+                
             if earliest_time is not None:
                 later_comments = Comment.query.filter(
                     Comment.ctime >= earliest_time,
                     Comment.oid == oid,
                     Comment.root == 0
                 ).all()
+                
                 for later_comment in later_comments:
                     if later_comment.rpid not in all_rpid:
                         later_comment.guardian_status = -1
@@ -227,89 +268,136 @@ class Scraper:
                     else:
                         later_comment.guardian_status = 1
 
-            for sub_comment_rpid, sub_comment_sub_comments_rpids in sub_comments_dict.items():
+            # Update sub-comments status
+            for sub_comment_rpid, sub_comment_ids in sub_comments_dict.items():
                 sub_comments = Comment.query.filter(
                     Comment.root == sub_comment_rpid
                 ).all()
                 for sub_comment in sub_comments:
-                    if sub_comment.rpid not in sub_comment_sub_comments_rpids:
+                    if sub_comment.rpid not in sub_comment_ids:
                         sub_comment.guardian_status = -1
                     else:
                         sub_comment.guardian_status = 1
 
+            # Save new comments to database
             filtered_db_comments = [comment_ for comment_ in db_comments if Comment.query.get(comment_.rpid) is None]
             self.db.session.bulk_save_objects(filtered_db_comments)
             self.db.session.commit()
 
-        for video in tqdm.tqdm(recent_videos):
+        # Process videos and get comments
+        for video_data in tqdm.tqdm(recent_videos):
+            # Get comments sorted by time
             video_comments_time, video_sub_comments_time, full_scrape_time = await get_comments(
-                video["aid"],
-                type_=comment.ResourceType.VIDEO,
+                video_data["aid"],
+                type_=CommentResourceType.VIDEO,
                 max_page=self.config.max_page,
                 order=OrderType.TIME
             )
+            
+            # Get comments sorted by likes
             video_comments_likes, video_sub_comments_likes, full_scrape_like = await get_comments(
-                video["aid"],
-                type_=comment.ResourceType.VIDEO,
+                video_data["aid"],
+                type_=CommentResourceType.VIDEO,
                 max_page=self.config.max_page,
                 order=OrderType.LIKE,
                 ignore_list=set(video_comments_time.keys())
             )
+            
             all_rpid = set(video_comments_likes.keys()).union(video_comments_time.keys())
             sub_comments_dict = dict(video_sub_comments_time)
             sub_comments_dict.update(video_sub_comments_likes)
 
             update_comments(
-                video['title'],
-                video['aid'],
+                video_data['title'],
+                video_data['aid'],
                 video_comments_time,
                 video_comments_likes,
                 full_scrape_time and full_scrape_like
             )
 
-        def dynamic_desc(dynamic_: {}) -> str:
+        def dynamic_desc(dynamic_: dict) -> str:
+            """Get a readable description of a dynamic"""
             dynamic_type = dynamic_['desc']['type']
-            # dynamic_type 见 https://github.com/SocialSisterYi/bilibili-API-collect/issues/143
-            if dynamic_type == 1:
-                uname = dynamic_['card']['origin_user']['info']['uname'] if 'origin_user' in dynamic_['card'] else "未知用户"
-                return f"{dynamic_['card']['item']['content']}：转发\"{uname}\""
-            elif dynamic_type == 2:
-                return dynamic_['card']['item']['description']
-            elif dynamic_type == 4:
-                return dynamic_['card']['item']['content']
+            
+            # Handle different dynamic types
+            if dynamic_type == 1:  # Repost
+                card_data = dynamic.get('card', {})
+                if isinstance(card_data, str):
+                    try:
+                        import json
+                        card_data = json.loads(card_data)
+                    except:
+                        card_data = {}
+                        
+                uname = "未知用户"
+                if 'origin_user' in card_data:
+                    if isinstance(card_data['origin_user'], dict) and 'info' in card_data['origin_user']:
+                        uname = card_data['origin_user']['info'].get('uname', "未知用户")
+                        
+                content = card_data.get('item', {}).get('content', "")
+                return f"{content}：转发\"{uname}\""
+                
+            elif dynamic_type == 2:  # Image dynamic
+                card_data = dynamic.get('card', {})
+                if isinstance(card_data, str):
+                    try:
+                        import json
+                        card_data = json.loads(card_data)
+                    except:
+                        card_data = {}
+                return card_data.get('item', {}).get('description', "")
+                
+            elif dynamic_type == 4:  # Text dynamic
+                card_data = dynamic.get('card', {})
+                if isinstance(card_data, str):
+                    try:
+                        import json
+                        card_data = json.loads(card_data)
+                    except:
+                        card_data = {}
+                return card_data.get('item', {}).get('content', "")
+                
+            return f"动态 {dynamic_['desc'].get('dynamic_id', '')}"
 
-        def dynamic_resource_type(dynamic_: {}):
+        def dynamic_resource_type(dynamic_: dict) -> CommentResourceType:
+            """Determine the resource type of a dynamic for comment fetching"""
             dynamic_type = dynamic_['desc']['type']
             if dynamic_type == 2:
-                return ResourceType.DYNAMIC_DRAW
+                return CommentResourceType.DYNAMIC_DRAW
             else:
-                return ResourceType.DYNAMIC
+                return CommentResourceType.DYNAMIC
 
-        for dynamic in tqdm.tqdm(recent_dynamics):
+        # Process dynamics and get comments
+        for dynamic_data in tqdm.tqdm(recent_dynamics):
+            # Get comments sorted by time
             dynamic_comments_time, dynamic_sub_comments_time, full_scrape_time = await get_comments(
-                dynamic_oid(dynamic),
-                type_=dynamic_resource_type(dynamic),
+                dynamic_oid(dynamic_data),
+                type_=dynamic_resource_type(dynamic_data),
                 max_page=self.config.max_page,
                 order=OrderType.TIME
             )
+            
+            # Get comments sorted by likes
             dynamic_comments_likes, dynamic_sub_comments_likes, full_scrape_like = await get_comments(
-                dynamic_oid(dynamic),
-                type_=dynamic_resource_type(dynamic),
+                dynamic_oid(dynamic_data),
+                type_=dynamic_resource_type(dynamic_data),
                 max_page=self.config.max_page,
                 order=OrderType.LIKE,
                 ignore_list=set(dynamic_comments_time.keys())
             )
+            
             all_rpid = set(dynamic_comments_likes.keys()).union(dynamic_comments_time.keys())
             sub_comments_dict = dict(dynamic_sub_comments_time)
             sub_comments_dict.update(dynamic_sub_comments_likes)
 
             update_comments(
-                dynamic_desc(dynamic),
-                dynamic_oid(dynamic),
+                dynamic_desc(dynamic_data),
+                dynamic_oid(dynamic_data),
                 dynamic_comments_time,
                 dynamic_comments_likes,
                 full_scrape_like and full_scrape_time
             )
+        
         self.last_refreshed = datetime.now()
 
     async def scraper_loop(self):

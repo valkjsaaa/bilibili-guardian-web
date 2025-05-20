@@ -1,10 +1,9 @@
-git+https://github.com/valkjsaaa/bilibili_api.git@255c64b3aba82d3c9f7f5685607aa9ec2b930acc
 Flask~=2.0.2
 Flask-Script~=2.0.6
 Flask-SQLAlchemy~=2.5.1
 Flask-Cors~=3.0.10
 SQLAlchemy~=1.4.26
-aiohttp~=3.7.4.post0
+aiohttp>=3.8.5
 tqdm~=4.62.3
 cchardet~=2.1.7
 requests~=2.26.0

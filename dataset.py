@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, timedelta
 
-from bilibili_api.comment import ResourceType
+from bilibili_api.comment import CommentResourceType
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, DateTime, Text
 
@@ -30,24 +30,24 @@ class Comment(db.Model):
         return self.ctime + timedelta(hours=8)
 
     def type_name(self):
-        if self.type_ == ResourceType.VIDEO:
+        if self.type_ == CommentResourceType.VIDEO.value:
             return "视频"
-        elif self.type_ == ResourceType.ARTICLE:
+        elif self.type_ == CommentResourceType.ARTICLE.value:
             return "文章"
-        elif self.type_ == ResourceType.DYNAMIC:
+        elif self.type_ == CommentResourceType.DYNAMIC.value:
             return "动态"
-        elif self.type_ == ResourceType.DYNAMIC_DRAW:
+        elif self.type_ == CommentResourceType.DYNAMIC_DRAW.value:
             return "图片动态"
         else:
             return "未知"
 
     def object_desc(self):
-        resource_type = ResourceType(self.type_)
-        if resource_type == ResourceType.VIDEO:
+        resource_type = CommentResourceType(self.type_)
+        if resource_type == CommentResourceType.VIDEO:
             return f"{self.type_name()} av{self.oid}"
-        elif resource_type == ResourceType.ARTICLE:
+        elif resource_type == CommentResourceType.ARTICLE:
             return f"{self.type_name()} {self.oid}"
-        elif resource_type in [ResourceType.DYNAMIC, ResourceType.DYNAMIC_DRAW]:
+        elif resource_type in [CommentResourceType.DYNAMIC, CommentResourceType.DYNAMIC_DRAW]:
             return f"{self.type_name()} {self.oid}"
 
     @staticmethod
@@ -56,11 +56,11 @@ class Comment(db.Model):
 
     @staticmethod
     def get_object_link(type_: int, oid: int, rpid: int) -> str:
-        if type_ == ResourceType.VIDEO.value:
+        if type_ == CommentResourceType.VIDEO.value:
             return f"https://www.bilibili.com/video/av{oid}"
-        elif type_ == ResourceType.DYNAMIC.value:
+        elif type_ == CommentResourceType.DYNAMIC.value:
             return f"https://t.bilibili.com/{oid}"
-        elif type_ == ResourceType.DYNAMIC_DRAW.value:
+        elif type_ == CommentResourceType.DYNAMIC_DRAW.value:
             return f"https://h.bilibili.com/{oid}"
         else:
             return ""
@@ -75,7 +75,7 @@ class Comment(db.Model):
     def __repr__(self):
         return f"在{self.object_desc()}下用户 {self.mname} 的评论 {self.abstract_text(self.message, 10)}"
 
-    def __init__(self, user_json: {}, oname):
+    def __init__(self, user_json: dict, oname):
         self.rpid = user_json['rpid']
         self.message = user_json['content']['message']
         self.oid = user_json['oid']
@@ -83,11 +83,11 @@ class Comment(db.Model):
         self.type_ = user_json['type']
         self.mid = user_json['mid']
         self.mname = user_json['member']['uname']
-        self.fansgrade = user_json['fansgrade']
+        self.fansgrade = user_json.get('fansgrade', 0)
         self.ctime = datetime.utcfromtimestamp(user_json['ctime'])
         self.rcount = user_json['rcount']
         self.like = user_json['like']
-        self.root = user_json['root']
-        self.parent = user_json['parent']
+        self.root = user_json.get('root', 0)
+        self.parent = user_json.get('parent', 0)
         self.guardian_status = 1
         self.raw = json.dumps(user_json)
