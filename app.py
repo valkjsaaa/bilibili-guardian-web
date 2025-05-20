@@ -152,7 +152,15 @@ if __name__ == '__main__':
 
     config = Config(**config_dict)
     scraper = Scraper(config, db, app)
-    scraper.run_scraper()
-
+    
     app.config['PREFERRED_URL_SCHEME'] = 'https'
-    app.run(host='0.0.0.0', port=5000)
+    
+    # Use asyncio to run Flask properly with the new scraper setup
+    import asyncio
+    from werkzeug.serving import run_simple
+    
+    # Set up scraper in event loop
+    scraper.run_scraper()
+    
+    # Run Flask with the existing event loop
+    run_simple('0.0.0.0', 5000, app, use_reloader=False, threaded=True)

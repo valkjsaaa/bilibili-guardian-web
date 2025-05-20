@@ -416,6 +416,20 @@ class Scraper:
         loop.run_until_complete(self.scraper_loop())
 
     def run_scraper(self):
+        import threading
+        import asyncio
+        
+        # Create background task instead of thread
+        async def start_in_background():
+            # Small delay to allow Flask to start
+            await asyncio.sleep(1)
+            try:
+                await self.scraper_loop()
+            except Exception as e:
+                print(f"Scraper failed: {e}")
+        
+        # Get the current event loop - we'll run in the main process
         loop = asyncio.get_event_loop()
-        thread = threading.Thread(target=self.scraper_thread, args=(loop,))
-        thread.start()
+        
+        # Schedule the scraper to run as a background task
+        loop.create_task(start_in_background())
